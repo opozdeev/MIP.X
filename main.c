@@ -44,18 +44,28 @@
 #include "mcc_generated_files/mcc.h"
 #include "measure.h"
 #include "RS485.h"
+#include "Indikator.h"
 
 /*
                          Main application
  */
 void main(void)
 {
+    extern union uIndData Indik;
     // Initialize the device
     SYSTEM_Initialize();
 
-    init_address();
+    //настройка регистра управления
+    LATCH_SetLow();//запретим защёлкивание данных в регистр управления
+    CLR_SetLow();//сбросим регистр управления
+    CLR_SetHigh();//уберём сброс
+    Indik.sData.AddrLatch = 0;//активируем строб записи адреса
+    Indik.sData.RelayOut = NC;//обы ключа будут буз тока
+    Indik.sData.Hl1 = HL1GREEN;//включим один цвет
+    Indik.sData.Hl2 = HL2OFF;//включим второй светодиод
+    Indik.sData.HvOut = OUTOFF;//выключим выходные реле
+    WriteOuts(Indik);//запишем это в управляющий регистр и подготовимся к чтению адреса
     
-    HL1_SetLow();
     // If using interrupts in PIC18 High/Low Priority Mode you need to enable the Global High and Low Interrupts
     // If using interrupts in PIC Mid-Range Compatibility Mode you need to enable the Global and Peripheral Interrupts
     // Use the following macros to:
@@ -73,12 +83,21 @@ void main(void)
     //INTERRUPT_PeripheralInterruptDisable();
 
     measures measure;
-    TX_nRC_SetLow();
+    TX_nRC_SetLow();//переключимся на приём
+    
+    //read_address();
+    
     while (1)
     {
-        measure = get_measure();        //WATCHDOG перезагружается во время работы АЦП
+        measure = get_measure();//WATCHDOG перезагружается во время работы АЦП
         save_measure(measure);
         safe_switch(measure.voltage);
+        Indik.sData.Hl1 = ~Indik.sData.Hl1;//помигаем светодиодом
+        WriteOuts(Indik);//обновим содержимое регистра управления и считаем адрес если нужно
+        Indik.sData.AddrLatch = ~Indik.sData.AddrLatch;
+        //иногда не выключается передатчик, код дальше должен выключать его, хотя я в этом не уверен до конца
+        if ((!IsTXState()) && TX_nRC_GetValue()) TX_nRC_SetLow();//если передавать не надо, но передатчик включен - выключаем передатчик
+        else CLRWDT();
     };
 }
 

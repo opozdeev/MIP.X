@@ -1,65 +1,6 @@
 #include "RS485.h"
 
-#define READ_COILS                  0x01
-#define READ_DISCRETE_INPUTS        0x02
-#define READ_HOLDING_REGISTERS      0x03
-#define READ_INPUT_REGISTERS        0x04
-#define WRITE_SINGLE_COIL           0x05
-#define WRITE_SINGLE_REGISTER       0x06
-#define READ_EXCEPTION_STATUS       0x07
-#define READ_WRITE_MULTIPLE_REGISTERS    0x17
 
-
-#define ADDRESS                     0
-#define FUNCTION                    1
-
-#define STARTING_ADDRESS_HI         2
-#define STARTING_ADDRESS_LO         3
-#define QUANTITY_OF_COILS_HI        4
-#define QUANTITY_OF_COILS_LO        5
-
-#define QUANTITY_OF_REGISTERS_HI    4
-#define QUANTITY_OF_REGISTERS_LO    5
-
-#define WRITE_STARTING_ADDRESS_HI   6
-#define WRITE_STARTING_ADDRESS_LO   7
-
-#define QUANTITY_TO_WRITE_REGISTERS_HI  8
-#define QUANTITY_TO_WRITE_REGISTERS_LO  9
-
-#define WRITE_BYTE_COUNT            10
-
-#define U_CALIBR_VALUE_HI           11
-#define U_CALIBR_VALUE_LO           12
-
-#define I_CALIBR_VALUE_HI           13
-#define I_CALIBR_VALUE_LO           14
-
-#define U_CALIBR_VALUE_SEND_HI      3
-#define U_CALIBR_VALUE_SEND_LO      4
-#define I_CALIBR_VALUE_SEND_HI      5
-#define I_CALIBR_VALUE_SEND_LO      6
-
-#define COIL_VALUE_HI               4
-#define COIL_VALUE_LO               5
-
-#define BYTE_COUNT                  2
-#define COILS_STATUS                3
-
-#define ERROR_CODE                  1
-#define EXCEPTION_CODE              2
-
-#define OFF_500V_COIL               0
-#define ON_500V_PLUS_COIL           1
-#define ON_500V_MINUS_COIL          2
-#define ON_GROUND_COIL              3
-
-void send_Coils(uint8_t receive[EUSART1_RX_BUFFER_SIZE]);
-void send_Input_Registers(uint8_t receive[EUSART1_RX_BUFFER_SIZE]);
-void send_Write_Coil(uint8_t receive[EUSART1_RX_BUFFER_SIZE]);
-void write_Calibr_Coefs(uint8_t receive[EUSART1_RX_BUFFER_SIZE]);
-
-void send_Error_Code(uint8_t receive[EUSART1_RX_BUFFER_SIZE], uint8_t exception);
 
 //answer_frame answer;
 
@@ -74,15 +15,17 @@ void send_Error_Code(uint8_t receive[EUSART1_RX_BUFFER_SIZE], uint8_t exception)
 /* Адреса Input Registers 
  * 
  * 1 R - Resistance     2000
- * 2 U - Voltage        2002
- * 3 I - Current        2004
+ * 2 U - Voltage HV     2002
+ * 3 I - Current HV     2004
+ * 4 Uin - Voltage LV   2006
  */
 
 /* Адреса Регистров коэффициентов 
  * 
  * 20 R - Resistance
- * 21 I - Current
- * 22 U - Voltage
+ * 21 I - Current HV
+ * 22 U - Voltage HV
+ * 23 Uin - Voltage LV
  */
 
 extern bool OFF_500V;
@@ -91,6 +34,7 @@ extern bool ON_500V_Minus;
 extern bool Ground;
 
 static measures response_measure;
+static bool TXState = false;//состояние передачи
 
 // | сюда после срабатывания таймера, то есть после свободности в линии после принятия кадра
 // V размер принятого кадра меньше размера буфера приемника УАРТ
@@ -201,13 +145,67 @@ void send_Coils(uint8_t *request)
     send(response, sizeof(response));
 }
 
+
+uint8_t send_short_ir_answer(uint8_t *request)
+{
+    if (request[STARTING_ADDRESS_LO] < 0x01 ||
+        request[STARTING_ADDRESS_LO] > 0x02 ||
+        request[STARTING_ADDRESS_HI] != 0x00 ||
+        request[QUANTITY_OF_REGISTERS_LO] < 1 ||
+        request[QUANTITY_OF_REGISTERS_LO] > 2 ||
+        request[QUANTITY_OF_REGISTERS_HI] != 0 )
+    {
+        return 0;
+    }
+    
+    union REG
+    {
+        uint16_t w;
+        uint8_t b[2];
+    };
+
+    union REG volt, resist;
+    resist.w = (uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
+    volt.w = (uint16_t) abs(response_measure.voltagein) * 100;
+
+    uint8_t response[20], i, j;
+    response[ADDRESS] = get_addr();
+    response[FUNCTION] = READ_INPUT_REGISTERS;
+    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO];
+    response[3] = volt.b[0];
+    response[4] = volt.b[1];
+    response[5] = resist.b[0];
+    response[6] = resist.b[1];
+
+    request[STARTING_ADDRESS_LO] = request[STARTING_ADDRESS_LO] - 0x01;
+    j = 2;
+    for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
+    {
+        j++;
+        response[j] = response[i];
+    }
+    //рассчитать СRC
+    uint16_t tempCRC;
+
+    tempCRC = CRC16(response, j+1);
+
+    response[j+1] = (uint8_t)(tempCRC);
+    response[j+2] = (uint8_t)(tempCRC >> 8);
+
+    send(response, j+3);
+    return 1;
+}
+
 void send_Input_Registers(uint8_t *request)
 {
+    if ( 0 == send_short_ir_answer( request ) )
+        return;
+
     if (request[STARTING_ADDRESS_LO] < 0xD0 ||
         request[STARTING_ADDRESS_LO] > 0xD5 ||
         request[STARTING_ADDRESS_HI] != 0x07 ||
         request[QUANTITY_OF_REGISTERS_LO] < 1 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 6 ||
+        request[QUANTITY_OF_REGISTERS_LO] > 8 ||
         request[QUANTITY_OF_REGISTERS_HI] != 0)
     {
         //EXCEPTION_CODE == 2
@@ -218,18 +216,19 @@ void send_Input_Registers(uint8_t *request)
     request[STARTING_ADDRESS_HI] = request[STARTING_ADDRESS_HI] - 0x07;
     request[STARTING_ADDRESS_LO] = request[STARTING_ADDRESS_LO] - 0xD0;
     
-    uint8_t response[17], i, j;
+    uint8_t response[17+4], i, j;
     union FloatChar
     {
         float fl;
         uint8_t ch[4];
     };
     
-    union FloatChar resistance, voltage, current;
+    union FloatChar resistance, voltage, current, voltagein;
     
     resistance.fl = response_measure.resistance;
     voltage.fl = response_measure.voltage;
     current.fl = response_measure.current;
+    voltagein.fl = response_measure.voltagein;
         
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
@@ -246,6 +245,12 @@ void send_Input_Registers(uint8_t *request)
     response[12] = current.ch[1];
     response[13] = current.ch[2];
     response[14] = current.ch[3];
+    
+    response[15] = voltagein.ch[0];
+    response[16] = voltagein.ch[1];
+    response[17] = voltagein.ch[2];
+    response[18] = voltagein.ch[3];
+    
     
     j = 2;
     for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
@@ -398,7 +403,7 @@ void write_Calibr_Coefs(uint8_t *request)
         float fl;
         uint8_t ch[4];
     };
-    union FloatChar U_coef, U_bias, I_above_100_coef, I_above_100_bias, I_below_100_coef, R_bias;
+    union FloatChar U_coef, U_bias, I_above_100_coef, I_above_100_bias, I_below_100_coef, R_bias, Uin_coef, Uin_bias;
     
     U_coef.ch[0] = request[11];
     U_coef.ch[1] = request[12];
@@ -424,6 +429,16 @@ void write_Calibr_Coefs(uint8_t *request)
     R_bias.ch[1] = request[32];
     R_bias.ch[2] = request[33];
     R_bias.ch[3] = request[34];
+    /*
+    Uin_coef.ch[0] = request[35];
+    Uin_coef.ch[1] = request[36];
+    Uin_coef.ch[2] = request[37];
+    Uin_coef.ch[3] = request[38];
+    Uin_bias.ch[0] = request[39];
+    Uin_bias.ch[1] = request[40];
+    Uin_bias.ch[2] = request[41];
+    Uin_bias.ch[3] = request[42];
+     */
     
     eeprom_write_object(0x01, &U_coef.fl, sizeof(float));
     eeprom_write_object(0x05, &U_bias.fl, sizeof(float));
@@ -431,6 +446,8 @@ void write_Calibr_Coefs(uint8_t *request)
     eeprom_write_object(0x0D, &I_above_100_bias.fl, sizeof(float));
     eeprom_write_object(0x11, &I_below_100_coef.fl, sizeof(float));
     eeprom_write_object(0x15, &R_bias.fl, sizeof(float));
+    eeprom_write_object(0x19, &Uin_coef.fl, sizeof(float));
+    eeprom_write_object(0x1C, &Uin_bias.fl, sizeof(float));
     
     
     eeprom_read_object(0x01, &U_coef.fl, sizeof(float));
@@ -439,6 +456,8 @@ void write_Calibr_Coefs(uint8_t *request)
     eeprom_read_object(0x0D, &I_above_100_bias.fl, sizeof(float));
     eeprom_read_object(0x11, &I_below_100_coef.fl, sizeof(float));
     eeprom_read_object(0x15, &R_bias.fl, sizeof(float));
+    eeprom_read_object(0x19, &Uin_coef.fl, sizeof(float));
+    eeprom_read_object(0x1C, &Uin_bias.fl, sizeof(float));
     
     //uint8_t response[13];
     
@@ -469,16 +488,26 @@ void write_Calibr_Coefs(uint8_t *request)
     request[24] = R_bias.ch[1];
     request[25] = R_bias.ch[2];
     request[26] = R_bias.ch[3];
+    /*
+    request[27] = Uin_coef.ch[0];
+    request[28] = Uin_coef.ch[1];
+    request[29] = Uin_coef.ch[2];
+    request[30] = Uin_coef.ch[3];
+    request[31] = Uin_bias.ch[0];
+    request[32] = Uin_bias.ch[1];
+    request[33] = Uin_bias.ch[2];
+    request[34] = Uin_bias.ch[3];
+     */
     
     //рассчитать СRC
     uint16_t tempCRC;
     
     tempCRC = CRC16(request, 27);
     
-    request[27] = (uint8_t)(tempCRC);
-    request[28] = (uint8_t)(tempCRC >> 8);
+    request[27/*+8*/] = (uint8_t)(tempCRC);
+    request[28/*+8*/] = (uint8_t)(tempCRC >> 8);
     
-    send(request, 29);
+    send(request, 29/*+8*/);
 }
 
 
@@ -565,19 +594,20 @@ void send_Error_Code(uint8_t *request, uint8_t exception)
     
     send(response, sizeof(response));
 }
-
+//отправка буфера chptr[] размером size
 void send(uint8_t *chptr, uint8_t size)
 {
     uint8_t i;
     
-    TX_nRC_SetHigh();
+    TX_nRC_SetHigh();//переключаем на передачу
     for (i = 0; i < size; i++)
         EUSART1_Write(*chptr++);
+    SetTXState();
 }
 
 void send_done(void)
 {
-    TX_nRC_SetLow();
+    TX_nRC_SetLow();//переключаем на приём
 }
 
 void save_measure(measures measure)
@@ -591,4 +621,19 @@ void save_measure(measures measure)
     INTERRUPT_GlobalInterruptEnable();
     // Enable the Peripheral Interrupts
     INTERRUPT_PeripheralInterruptEnable();
+}
+
+void ResetTXState(void)
+{
+    TXState = false;
+}
+
+void SetTXState(void)
+{
+    TXState = true;
+}
+
+bool IsTXState(void)
+{
+    return TXState;
 }

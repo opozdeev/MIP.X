@@ -6,6 +6,8 @@
 #include "mcc_generated_files/interrupt_manager.h"
 #include <stdbool.h>
 
+extern union uIndData Indik;
+
 void TurnON_500V_Minus(void);
 
 void TurnON_500V_Plus(void);

@@ -61,14 +61,12 @@ void PIN_MANAGER_Initialize(void)
     LATB = 0x00;
     LATC = 0x00;
 
-    HL1_SetLow();
-    HL2_LOAD_SetHigh();
     /**
     TRISx registers
     */
     TRISA = 0x00;
     TRISB = 0x30;
-    TRISC = 0x0D;
+    TRISC = 0x0F;
 
     /**
     ANSELx registers

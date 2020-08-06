@@ -108,8 +108,8 @@ adc_result_t ADC_GetConversionResult(void)
 adc_result_t ADC_GetConversion(adc_channel_t channel)
 {
     // select the A/D channel
-    ADCON0bits.CHS = channel;    
-
+    ADCON0bits.CHS = channel;
+    
     // Turn on the ADC module
     ADCON0bits.ADON = 1;
 

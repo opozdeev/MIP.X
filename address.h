@@ -7,7 +7,7 @@
 
 uint8_t get_addr(void);
 
-void init_address(void);
+void read_address(void);
 
 #endif	/* ADDRESS_H */
 

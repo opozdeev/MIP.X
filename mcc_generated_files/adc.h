@@ -94,6 +94,7 @@ typedef struct
 
 typedef enum
 {
+    Vin =  0x5,
     FB_U =  0x6,
     FB_I =  0xA,
     channel_DAC =  0xE,

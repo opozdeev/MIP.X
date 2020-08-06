@@ -1,4 +1,5 @@
 #include "high_voltage_control.h"
+#include "Indikator.h"
 
 bool OFF_500V = true;
 bool ON_500V_Plus = false;
@@ -12,14 +13,11 @@ bool Transition_to_ON_500V_Minus = false;
 
 void TurnON_500V_Minus(void)
 {
-    //OFF_500V_P_SetHigh(); 
-    //OFF_500V_M_SetLow();
-    //EPWM1_TurnON();
     if (ON_500V_Minus)
         return;
     EPWM1_TurnOFF();
     
-    HL2_LOAD_SetLow();
+    Indik.sData.Hl2 = HL2ON;//ВКЛЮЧИТЬ СВЕТОДИОД
     
     Transition_to_Ground = false;
     Transition_to_OFF_500V = false;
@@ -29,22 +27,15 @@ void TurnON_500V_Minus(void)
     ON_500V_Plus = false;
     ON_500V_Minus = false;
     Ground = false;
-    /*OFF_500V = false;
-    ON_500V_Plus = false;
-    ON_500V_Minus = true;
-    Ground = false;*/
 }
 
 void TurnON_500V_Plus(void)
 {
-    //OFF_500V_M_SetHigh(); 
-    //OFF_500V_P_SetLow();
-    //EPWM1_TurnON();
     if (ON_500V_Plus)
         return;
     EPWM1_TurnOFF();
     
-    HL2_LOAD_SetLow();
+    Indik.sData.Hl2 = HL2ON;//ВКЛЮЧИТЬ СВЕТОДИОД
     
     Transition_to_Ground = false;
     Transition_to_OFF_500V = false;
@@ -54,11 +45,7 @@ void TurnON_500V_Plus(void)
     ON_500V_Plus = false;
     ON_500V_Minus = false;
     Ground = false;
-    /*OFF_500V = false;
-    ON_500V_Plus = true;
-    ON_500V_Minus = false;
-    Ground = false;*/
-}
+ }
 
 void TurnOFF_500V(void)
 {
@@ -69,10 +56,8 @@ void TurnOFF_500V(void)
     RC4_SetLow();
     RC5_SetDigitalOutput();
     RC5_SetLow();
-    //OFF_500V_P_SetHigh(); 
-    //OFF_500V_M_SetHigh();
     
-    HL2_LOAD_SetHigh();
+    Indik.sData.Hl2 = HL2OFF;//ВЫКЛЮЧИМ СВЕТОДИОД
     
     Transition_to_Ground = false;
     Transition_to_OFF_500V = true;
@@ -82,10 +67,6 @@ void TurnOFF_500V(void)
     ON_500V_Plus = false;
     ON_500V_Minus = false;
     Ground = false;
-    /*OFF_500V = true;
-    ON_500V_Plus = false;
-    ON_500V_Minus = false;
-    Ground = false;*/
 }
 
 void TurnON_GND(void)
@@ -97,10 +78,8 @@ void TurnON_GND(void)
     RC4_SetLow();
     RC5_SetDigitalOutput();
     RC5_SetLow();
-    //OFF_500V_M_SetLow();
-    //OFF_500V_P_SetLow();
-    
-    HL2_LOAD_SetHigh();
+     
+    Indik.sData.Hl2 = HL2OFF;//ВЫКЛЮЧИМ СВЕТОДИОД
     
     Transition_to_Ground = true;
     Transition_to_OFF_500V = false;
@@ -110,10 +89,6 @@ void TurnON_GND(void)
     ON_500V_Plus = false;
     ON_500V_Minus = false;
     Ground = false;
-    /*OFF_500V = false;
-    ON_500V_Plus = false;
-    ON_500V_Minus = false;
-    Ground = true;*/
 }
 
 void safe_switch(float voltage)
@@ -125,8 +100,9 @@ void safe_switch(float voltage)
     {
         if (voltage <= 20)
         {
-            OFF_500V_M_SetLow();
-            OFF_500V_P_SetLow();
+//!!!!!!!!!!!!!!!!!!ВЫКЛЮЧИТЬ МИНУСОВУЮ ПОЛЯРНОСТЬ            OFF_500V_M_SetLow();//включить все реле
+//!!!!!!!!!!!!!!!!!!ВЫКЛЮЧИТЬ ПЛЮСОВУЮ ПОЛЯРНОСТЬ            OFF_500V_P_SetLow();
+            Indik.sData.HvOut = OUTOFF;//тут идёт разряд на землю, но в данной версии его нет
             
             Transition_to_Ground = false;
             Transition_to_OFF_500V = false;
@@ -143,8 +119,9 @@ void safe_switch(float voltage)
     {
         if (voltage <= 20)
         {
-            OFF_500V_P_SetHigh();
-            OFF_500V_M_SetHigh();
+//!!!!!!!!!!!!!!!!!!            OFF_500V_P_SetHigh();//выключить все реле
+//!!!!!!!!!!!!!!!!!!            OFF_500V_M_SetHigh();
+            Indik.sData.HvOut = OUTOFF;//тут идёт разряд на землю, но в данной версии его нет
             
             Transition_to_Ground = false;
             Transition_to_OFF_500V = false;
@@ -162,8 +139,9 @@ void safe_switch(float voltage)
     {
         if (voltage <= 20)
         {
-            OFF_500V_M_SetHigh(); 
-            OFF_500V_P_SetLow();
+//!!!!!!!!!!!!!!!!            OFF_500V_M_SetHigh(); 
+//!!!!!!!!!!!!!!!!            OFF_500V_P_SetLow();
+            Indik.sData.HvOut = OUTPLUS;//включить плюсовую полярность
             EPWM1_TurnON();
             
             Transition_to_Ground = false;
@@ -181,8 +159,9 @@ void safe_switch(float voltage)
     {
         if (voltage <= 20)
         {
-            OFF_500V_P_SetHigh(); 
-            OFF_500V_M_SetLow();
+//!!!!!!!!!!!!!!!!!            OFF_500V_P_SetHigh(); 
+//!!!!!!!!!!!!!!!!!            OFF_500V_M_SetLow();
+            Indik.sData.HvOut = OUTMINUS;//включить минусовую полярность
             EPWM1_TurnON();
             
             Transition_to_Ground = false;

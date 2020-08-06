@@ -64,7 +64,7 @@
 
 // CONFIG2H
 #pragma config WDTEN = ON    // Watchdog Timer Enable bit->WDT is always enabled. SWDTEN bit has no effect.
-#pragma config WDTPS = 2048    // Watchdog Timer Postscale Select bits->1:2048
+#pragma config WDTPS = 32768    // Watchdog Timer Postscale Select bits->1:32768
 
 // CONFIG3H
 #pragma config HFOFST = ON    // HFINTOSC Fast Start-up bit->HFINTOSC starts clocking the CPU without waiting for the oscillator to stablize.

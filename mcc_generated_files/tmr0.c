@@ -141,13 +141,23 @@ void TMR0_ISR(void)
 
     if(TMR0_InterruptHandler)
     {
-        TMR0_InterruptHandler();
+        TMR0_InterruptHandler();//тут ничего не выполняется
     }
 
     // add your TMR0 interrupt custom code
-    if (!EUSART1_is_RX_buffer_overflow())
-        recieve_frame(eusart1RxCount);
-    reset_recieve_buffer();
+    if (IsTXState())//если идёт прередача
+    {
+        ResetTXState();//выключить статус передачи
+        send_done();//переключиться на приём
+        PIE1bits.TX1IE = 0;
+        TMR0_StopTimer();//выключить Т0
+    }
+    else//если идёт приём
+    {
+        if (!EUSART1_is_RX_buffer_overflow())
+            recieve_frame(eusart1RxCount);
+        reset_recieve_buffer();
+    }
 }
 
 

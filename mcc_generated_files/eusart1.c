@@ -223,13 +223,16 @@ void EUSART1_Transmit_ISR(void)
             eusart1TxTail = 0;
         }
         eusart1TxBufferRemaining++;
+        TMR0_Initialize();//запустить Т0 на случай зависания передачи
     }
     else
     {
         if (EUSART1_is_tx_done())
         {
             PIE1bits.TX1IE = 0;
-            send_done();
+            send_done();//переключиться на приём
+            TMR0_StopTimer();//выключить Т0
+            ResetTXState();//выключить статус передачи
         }
     }
 }
