@@ -157,7 +157,7 @@ uint8_t send_short_ir_answer(uint8_t *request)
     {
         return 0;
     }
-    
+        
     union REG
     {
         uint16_t w;
@@ -165,13 +165,13 @@ uint8_t send_short_ir_answer(uint8_t *request)
     };
 
     union REG volt, resist;
-    resist.w = (uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
-    volt.w = (uint16_t) abs(response_measure.voltagein) * 100;
+    resist.w = 12345;//(uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
+    volt.w = 54321;//(uint16_t) abs(response_measure.voltagein) * 100;
 
     uint8_t response[20], i, j;
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
-    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO];
+    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     response[3] = volt.b[0];
     response[4] = volt.b[1];
     response[5] = resist.b[0];
@@ -198,11 +198,11 @@ uint8_t send_short_ir_answer(uint8_t *request)
 
 void send_Input_Registers(uint8_t *request)
 {
-    if ( 0 == send_short_ir_answer( request ) )
+    if ( 1 == send_short_ir_answer( request ) )
         return;
-
+    
     if (request[STARTING_ADDRESS_LO] < 0xD0 ||
-        request[STARTING_ADDRESS_LO] > 0xD5 ||
+        request[STARTING_ADDRESS_LO] > 0xD7 ||
         request[STARTING_ADDRESS_HI] != 0x07 ||
         request[QUANTITY_OF_REGISTERS_LO] < 1 ||
         request[QUANTITY_OF_REGISTERS_LO] > 8 ||
@@ -216,7 +216,7 @@ void send_Input_Registers(uint8_t *request)
     request[STARTING_ADDRESS_HI] = request[STARTING_ADDRESS_HI] - 0x07;
     request[STARTING_ADDRESS_LO] = request[STARTING_ADDRESS_LO] - 0xD0;
     
-    uint8_t response[17+4], i, j;
+    uint8_t response[18+4], i, j;
     union FloatChar
     {
         float fl;
@@ -225,11 +225,12 @@ void send_Input_Registers(uint8_t *request)
     
     union FloatChar resistance, voltage, current, voltagein;
     
-    resistance.fl = response_measure.resistance;
-    voltage.fl = response_measure.voltage;
-    current.fl = response_measure.current;
-    voltagein.fl = response_measure.voltagein;
+    resistance.fl = 1;//response_measure.resistance;
+    voltage.fl = 2;//response_measure.voltage;
+    current.fl = 3;//response_measure.current;
+    voltagein.fl = 4;//response_measure.voltagein;
         
+    
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
