@@ -36,8 +36,8 @@
  * 1001 - порядковый номер в серии (старшие два байта)
  * 1002 - порядковый номер в серии (младшие два байта)
  * 1003 - версия прошивки (в регистре 12 -> версия 1.2)
- * 1004 - дата производства/первой калибровки  (101220 -> 10/12/2021)
- * 1005 - дата последней калибровки (141021 -> 14/10/21)
+ * 1004 - месяц последней калибровки  (1219 -> декабрь 2019)
+ * 1005 - месяц следущей калибровки (1223 -> декабрь 2023)
  * 1006 - общее количесво пройденых калибровок
  *  
  * Адреса в eeprom для хранения данных устройства
@@ -215,12 +215,20 @@ static uint8_t send_device_ir_info(uint8_t *request)
     eeprom_read_object( 0x104, &serial_number_low.w, sizeof(uint16_t) );
     eeprom_read_object( 0x106, &soft_ver.w, sizeof(uint16_t) );
 
-    union REG create_date, last_calibrate_date, number_of_calibrate;
-    eeprom_read_object( 0x108, &create_date.w, sizeof(uint16_t) );
-    eeprom_read_object( 0x10a, &last_calibrate_date.w, sizeof(uint16_t) );
+    union REG last_calibrate, next_calibrate, number_of_calibrate;
+    eeprom_read_object( 0x108, &last_calibrate.w, sizeof(uint16_t) );
+    eeprom_read_object( 0x10a, &next_calibrate.w, sizeof(uint16_t) );
     eeprom_read_object( 0x10c, &number_of_calibrate.w, sizeof(uint16_t) );
     
-    uint8_t response[40], i, j;
+    hard_ver.w = 0x01;
+    serial_number_hight.w = 0x210;
+    serial_number_low.w = 0xfff3;
+    soft_ver.w = 12;
+    last_calibrate.w = 1219;
+    next_calibrate.w = 1222;
+    number_of_calibrate.w = 2;
+            
+    uint8_t response[20], i, j;
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
@@ -232,10 +240,10 @@ static uint8_t send_device_ir_info(uint8_t *request)
     response[8] = serial_number_low.b[1];
     response[9] = soft_ver.b[0];
     response[10] = soft_ver.b[1];
-    response[11] = create_date.b[0];
-    response[12] = create_date.b[1];
-    response[13] = last_calibrate_date.b[0];
-    response[14] = last_calibrate_date.b[1];
+    response[11] = last_calibrate.b[0];
+    response[12] = last_calibrate.b[1];
+    response[13] = next_calibrate.b[0];
+    response[14] = next_calibrate.b[1];
     response[15] = number_of_calibrate.b[0];
     response[16] = number_of_calibrate.b[1];
     
@@ -276,8 +284,8 @@ static uint8_t send_short_ir_answer(uint8_t *request)
     };
 
     union REG volt, resist;
-    resist.w = 12345;//(uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
-    volt.w = 54321;//(uint16_t) abs(response_measure.voltagein) * 100;
+    resist.w = 2578;//(uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
+    volt.w = 5431;//(uint16_t) abs(response_measure.voltagein) * 100;
 
     uint8_t response[20], i, j;
     response[ADDRESS] = get_addr();
@@ -331,10 +339,10 @@ static uint8_t send_long_ir_answer ( uint8_t *request )    {
     
     union FloatChar resistance, voltage, current, voltagein;
     
-    resistance.fl = 1;//response_measure.resistance;
-    voltage.fl = 2;//response_measure.voltage;
-    current.fl = 3;//response_measure.current;
-    voltagein.fl = 4;//response_measure.voltagein;
+    resistance.fl = 2.578;//response_measure.resistance;
+    voltage.fl = 12.55;//response_measure.voltage;
+    current.fl = 345.8;//response_measure.current;
+    voltagein.fl = 54.31;//response_measure.voltagein;
         
     
     response[ADDRESS] = get_addr();
