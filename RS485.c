@@ -12,12 +12,43 @@
  * 4 ЗЕМЛЯ
  */
 
-/* Адреса Input Registers 
- * 
- * 1 R - Resistance     2000
- * 2 U - Voltage HV     2002
- * 3 I - Current HV     2004
- * 4 Uin - Voltage LV   2006
+/* Адреса Input Registers полного запроса данных
+ *  (каждое измерение представлено float и упаковывано в 2 регистра Modbus)
+ * Регистры     - Описание
+ * 2000,2001    - Сопротивление изоляции полюса относительно земли, МОм
+ * 2002,2003    - Напряжение ИОНа, В
+ * 2004,2005    - Ток утечки через изоляцию, мкА
+ * 2006,2007    - Напряжение полюса, В
+ */
+
+/* Адреса Input Registers для краткого запроса
+ *  (всего два измерения: напряжение и споротивление полюса, каждое в одном регистре Modbus )
+ * Регистр     - Описание
+ * 1 - Напряжение полюса, увеличинное в 100 раз, В. 
+ *      Значению регистра 12345, соответствует напряжение 123,45 В.
+ * 2 - Сопротивление изоляции полюса, кОм.
+ *      Диапазон: 1-65000,кОм
+ */
+
+/* Адреса регистров для чтения/записи данных устройства
+ * Регистр     - Описание
+ * 1000 - номер серии/версия харда (печатной платы/принципиальной схемы)
+ * 1001 - порядковый номер в серии (старшие два байта)
+ * 1002 - порядковый номер в серии (младшие два байта)
+ * 1003 - версия прошивки (в регистре 12 -> версия 1.2)
+ * 1004 - дата производства/первой калибровки  (101220 -> 10/12/2021)
+ * 1005 - дата последней калибровки (141021 -> 14/10/21)
+ * 1006 - общее количесво пройденых калибровок
+ *  
+ * Адреса в eeprom для хранения данных устройства
+ * Адрес eeprom <- Регистр
+ * 0x100,0x101  <- 1000
+ * 0x102,0x103  <- 1001
+ * 0x104,0x105  <- 1002
+ * 0x106,0x107  <- 1003
+ * 0x108,0x109  <- 1004
+ * 0x10a,0x10b  <- 1005
+ * 0x10c,0x10d  <- 1006  
  */
 
 /* Адреса Регистров коэффициентов 
@@ -35,6 +66,10 @@ extern bool Ground;
 
 static measures response_measure;
 static bool TXState = false;//состояние передачи
+
+static uint8_t send_short_ir_answer(uint8_t *request);
+static uint8_t send_long_ir_answer(uint8_t *request);
+static uint8_t send_device_ir_info(uint8_t *request);
 
 // | сюда после срабатывания таймера, то есть после свободности в линии после принятия кадра
 // V размер принятого кадра меньше размера буфера приемника УАРТ
@@ -145,8 +180,84 @@ void send_Coils(uint8_t *request)
     send(response, sizeof(response));
 }
 
+void send_Input_Registers(uint8_t *request)
+{
+    if ( 1 == send_short_ir_answer( request ) )
+        return;
+    if ( 1 == send_long_ir_answer(request) )
+        return;
+    if ( 1 == send_device_ir_info(request) )
+        return;
+    
+    send_Error_Code(request, 2); //EXCEPTION_CODE == 2
+}
 
-uint8_t send_short_ir_answer(uint8_t *request)
+static uint8_t send_device_ir_info(uint8_t *request)
+{
+    if (request[STARTING_ADDRESS_LO] < 0xE8 ||
+        request[STARTING_ADDRESS_LO] > 0xEE ||
+        request[STARTING_ADDRESS_HI] != 0x03 ||
+        request[QUANTITY_OF_REGISTERS_LO] < 1 ||
+        request[QUANTITY_OF_REGISTERS_LO] > 7 ||
+        request[QUANTITY_OF_REGISTERS_HI] != 0)
+    {
+        return 0;
+    }
+    
+    union REG
+    {
+        uint16_t w;
+        uint8_t b[2];
+    };
+    union REG hard_ver, serial_number_hight, serial_number_low, soft_ver;
+    eeprom_read_object( 0x100, &hard_ver.w, sizeof(uint16_t) );
+    eeprom_read_object( 0x102, &serial_number_hight.w, sizeof(uint16_t) );
+    eeprom_read_object( 0x104, &serial_number_low.w, sizeof(uint16_t) );
+    eeprom_read_object( 0x106, &soft_ver.w, sizeof(uint16_t) );
+
+    union REG create_date, last_calibrate_date, number_of_calibrate;
+    eeprom_read_object( 0x108, &create_date.w, sizeof(uint16_t) );
+    eeprom_read_object( 0x10a, &last_calibrate_date.w, sizeof(uint16_t) );
+    eeprom_read_object( 0x10c, &number_of_calibrate.w, sizeof(uint16_t) );
+    
+    uint8_t response[40], i, j;
+    response[ADDRESS] = get_addr();
+    response[FUNCTION] = READ_INPUT_REGISTERS;
+    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
+    response[3] = hard_ver.b[0];
+    response[4] = hard_ver.b[1];
+    response[5] = serial_number_hight.b[0];
+    response[6] = serial_number_hight.b[1];
+    response[7] = serial_number_low.b[0];
+    response[8] = serial_number_low.b[1];
+    response[9] = soft_ver.b[0];
+    response[10] = soft_ver.b[1];
+    response[11] = create_date.b[0];
+    response[12] = create_date.b[1];
+    response[13] = last_calibrate_date.b[0];
+    response[14] = last_calibrate_date.b[1];
+    response[15] = number_of_calibrate.b[0];
+    response[16] = number_of_calibrate.b[1];
+    
+    request[STARTING_ADDRESS_HI] = request[STARTING_ADDRESS_HI] - 0x03;
+    request[STARTING_ADDRESS_LO] = request[STARTING_ADDRESS_LO] - 0xE8;
+    
+    j = 2;
+    for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
+    {
+        j++;
+        response[j] = response[i];
+    }
+    
+    uint16_t tempCRC;
+    tempCRC = CRC16(response, j+1);
+    response[j+1] = (uint8_t)(tempCRC);
+    response[j+2] = (uint8_t)(tempCRC >> 8);
+
+    send(response, j+3);
+    return 1;
+}
+static uint8_t send_short_ir_answer(uint8_t *request)
 {
     if (request[STARTING_ADDRESS_LO] < 0x01 ||
         request[STARTING_ADDRESS_LO] > 0x02 ||
@@ -196,10 +307,7 @@ uint8_t send_short_ir_answer(uint8_t *request)
     return 1;
 }
 
-void send_Input_Registers(uint8_t *request)
-{
-    if ( 1 == send_short_ir_answer( request ) )
-        return;
+static uint8_t send_long_ir_answer ( uint8_t *request )    {
     
     if (request[STARTING_ADDRESS_LO] < 0xD0 ||
         request[STARTING_ADDRESS_LO] > 0xD7 ||
@@ -208,9 +316,7 @@ void send_Input_Registers(uint8_t *request)
         request[QUANTITY_OF_REGISTERS_LO] > 8 ||
         request[QUANTITY_OF_REGISTERS_HI] != 0)
     {
-        //EXCEPTION_CODE == 2
-        send_Error_Code(request, 2);
-        return;
+        return 0;
     }
     
     request[STARTING_ADDRESS_HI] = request[STARTING_ADDRESS_HI] - 0x07;
@@ -262,73 +368,17 @@ void send_Input_Registers(uint8_t *request)
     
     //3 + request[STARTING_ADDRESS_LO]*2; // откуда
     //3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]; // докуда
-    
-    
+   
     //рассчитать СRC
     uint16_t tempCRC;
-    
     tempCRC = CRC16(response, j+1);
-    
     response[j+1] = (uint8_t)(tempCRC);
     response[j+2] = (uint8_t)(tempCRC >> 8);
     
     send(response, j+3);
+    return 1;
 }
 
-
-
-/*void send_Input_Registers(uint8_t *request)
-{
-    if (request[STARTING_ADDRESS_LO] > 2 ||
-        request[QUANTITY_OF_REGISTERS_LO] < 1 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 3 ||
-        request[QUANTITY_OF_REGISTERS_LO] > (3-request[STARTING_ADDRESS_LO]) ||
-        request[STARTING_ADDRESS_HI] != 0 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
-    {
-        //EXCEPTION_CODE == 2
-        send_Error_Code(request, 2);
-        return;
-    }
-    
-    
-    uint8_t response[11], i;
-    uint16_t voltage, current, res;
-    uint64_t temp = 0;
-    
-    voltage = (uint16_t)(response_measure.voltage * 10);
-    current = (uint16_t)(response_measure.current * 10);
-    res = (uint16_t)(response_measure.resistance * 100);
-    
-    temp |= voltage;
-    temp <<= 16;
-    temp |= current;
-    temp <<= 16;
-    temp |= res;
-    
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_INPUT_REGISTERS;
-    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
-    temp >>= request[STARTING_ADDRESS_LO] * 16;
-    temp <<= (64 - request[QUANTITY_OF_REGISTERS_LO]*16);
-    temp >>= (64 - request[QUANTITY_OF_REGISTERS_LO]*16);
-    for (i = 0; i < request[QUANTITY_OF_REGISTERS_LO]; i++)
-    {
-        response[BYTE_COUNT+1+2*i] = (uint8_t)(temp >> (16*i+8));          //HI
-        response[BYTE_COUNT+2+2*i] = (uint8_t)(temp >> (16*i));          //LO
-    }
-    
-    //рассчитать СRC
-    uint16_t tempCRC;
-    
-    tempCRC = CRC16(response, 3+response[BYTE_COUNT]);
-    
-    response[5+response[BYTE_COUNT]-2] = (uint8_t)(tempCRC);
-    response[5+response[BYTE_COUNT]-1] = (uint8_t)(tempCRC >> 8);
-    
-    send(response, 5+response[BYTE_COUNT]);
-}
-*/
 void send_Write_Coil(uint8_t *request)
 {
     //проверим адекватность запроса
@@ -398,7 +448,7 @@ void write_Calibr_Coefs(uint8_t *request)
         return;
     }
     
-    
+      
     union FloatChar
     {
         float fl;
@@ -510,72 +560,6 @@ void write_Calibr_Coefs(uint8_t *request)
     
     send(request, 29/*+8*/);
 }
-
-
-/*void write_Calibr_Coefs(uint8_t *request)
-{
-    //проверим адекватность запроса
-    if (request[STARTING_ADDRESS_LO] != 0 ||
-        request[STARTING_ADDRESS_HI] != 0 ||
-        request[QUANTITY_OF_REGISTERS_LO] != 2 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0 ||
-        request[WRITE_STARTING_ADDRESS_LO] != 0 ||
-        request[WRITE_STARTING_ADDRESS_HI] != 0 ||
-        request[QUANTITY_TO_WRITE_REGISTERS_LO] != 2 ||
-        request[QUANTITY_TO_WRITE_REGISTERS_HI] != 0 ||
-        request[WRITE_BYTE_COUNT] != 4)
-    {
-        //EXCEPTION_CODE == 2
-        send_Error_Code(request, 2);
-        return;
-    }
-        
-    float I_temp, U_temp;
-    uint16_t U_temp16, I_temp16;
-    
-    U_temp16 = request[U_CALIBR_VALUE_HI];
-    U_temp16 <<= 8;
-    U_temp16 |= request[U_CALIBR_VALUE_LO];
-    
-    I_temp16 = request[I_CALIBR_VALUE_HI];
-    I_temp16 <<= 8;
-    I_temp16 |= request[I_CALIBR_VALUE_LO];
-    
-    U_temp = (float) (U_temp16);
-    I_temp = (float) (I_temp16);
-    U_temp /= 1000;
-    I_temp /= 1000;
-    eeprom_write_object(0x01, &U_temp, sizeof(U_temp));
-    eeprom_write_object(0x05, &I_temp, sizeof(I_temp));
-    
-    
-    eeprom_read_object(0x01, &U_temp, sizeof(float));
-    eeprom_read_object(0x05, &I_temp, sizeof(float));
-    
-    U_temp16 = (uint16_t) (U_temp * 1000);
-    I_temp16 = (uint16_t) (I_temp * 1000);
-    
-    uint8_t response[9];
-    
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_WRITE_MULTIPLE_REGISTERS;
-    response[BYTE_COUNT] = 4;
-    response[U_CALIBR_VALUE_SEND_HI] = (uint8_t)(U_temp16 >> 8);
-    response[U_CALIBR_VALUE_SEND_LO] = (uint8_t)(U_temp16);
-    response[I_CALIBR_VALUE_SEND_HI] = (uint8_t)(I_temp16 >> 8);
-    response[I_CALIBR_VALUE_SEND_LO] = (uint8_t)(I_temp16);
-    
-    //рассчитать СRC
-    uint16_t tempCRC;
-    
-    tempCRC = CRC16(response, 7);
-    
-    response[7] = (uint8_t)(tempCRC);
-    response[8] = (uint8_t)(tempCRC >> 8);
-    
-    send(response, 9);
-}
-*/
 
 void send_Error_Code(uint8_t *request, uint8_t exception)
 {

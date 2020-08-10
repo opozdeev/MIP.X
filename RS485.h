@@ -69,7 +69,6 @@ void send_Write_Coil(uint8_t receive[EUSART1_RX_BUFFER_SIZE]);
 void write_Calibr_Coefs(uint8_t receive[EUSART1_RX_BUFFER_SIZE]);
 
 void send_Error_Code(uint8_t receive[EUSART1_RX_BUFFER_SIZE], uint8_t exception);
-uint8_t send_shot_ir_answer(uint8_t *request);
 
 extern volatile uint8_t eusart1TxHead;
 extern volatile uint8_t eusart1TxTail;
