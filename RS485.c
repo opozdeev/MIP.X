@@ -70,7 +70,7 @@ union REG
 static measures response_measure;
 static bool TXState = false;//состояние передачи
 static uint16_t tempCRC;
-static uint8_t response[42]; //22
+static uint8_t response[42]; 
 
 static uint8_t send_short_ir_answer(uint8_t *request, uint8_t *response );
 static uint8_t send_long_ir_answer(uint8_t *request, uint8_t *response );
@@ -103,8 +103,7 @@ void recieve_frame(uint8_t size){
     if (request[ADDRESS] != get_addr())
         return;
     
-    switch (request[FUNCTION])
-    {
+    switch (request[FUNCTION]){
         case READ_COILS:
         {
             send_Coils(request);
@@ -511,8 +510,8 @@ static void write_Calibr_Data(uint8_t *request){
     response[5] = request[QUANTITY_OF_REGISTERS_LO];
 
     tempCRC = CRC16(response, 6);
-    response[6] = (uint8_t)(tempCRC >> 8);
-    response[7] = (uint8_t)(tempCRC);
+    response[6] = (uint8_t)(tempCRC);
+    response[7] = (uint8_t)(tempCRC >> 8);
     send(response, 8);
 }
 static void send_Error_Code(uint8_t *request, uint8_t error_code){
@@ -520,10 +519,10 @@ static void send_Error_Code(uint8_t *request, uint8_t error_code){
     response[1] = (request[FUNCTION] | 0x80);
     response[2] = error_code;
     
-    tempCRC = CRC16(response, 3 );
-    response[3] = (uint8_t)(tempCRC >> 8);
-    response[4] = (uint8_t)(tempCRC);
-    send(response, 6);
+    uint16_t tempCRC = CRC16(response, 3 );
+    response[3] = (uint8_t)(tempCRC);
+    response[4] = (uint8_t)(tempCRC >> 8);
+    send(response, 5);
 }
 void send(uint8_t *chptr, uint8_t size){
     uint8_t i;
