@@ -89,8 +89,8 @@ typedef union {
   Section: Macro Declarations
 */
 
-#define EUSART1_TX_BUFFER_SIZE 29
-#define EUSART1_RX_BUFFER_SIZE 37
+#define EUSART1_TX_BUFFER_SIZE 50
+#define EUSART1_RX_BUFFER_SIZE 50
 
 /**
  Section: Global variables

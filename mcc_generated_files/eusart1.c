@@ -60,7 +60,6 @@ volatile uint8_t eusart1TxHead = 0;
 volatile uint8_t eusart1TxTail = 0;
 volatile uint8_t eusart1TxBuffer[EUSART1_TX_BUFFER_SIZE];
 volatile uint8_t eusart1TxBufferRemaining;
-
 volatile uint8_t eusart1RxHead = 0;
 volatile uint8_t eusart1RxTail = 0;
 volatile uint8_t eusart1RxBuffer[EUSART1_RX_BUFFER_SIZE];
