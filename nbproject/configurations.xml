@@ -23,6 +23,7 @@
       <itemPath>measure.h</itemPath>
       <itemPath>RS485.h</itemPath>
       <itemPath>CRC16.h</itemPath>
+      <itemPath>relay_control.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -51,6 +52,7 @@
       <itemPath>RS485.c</itemPath>
       <itemPath>CRC16.c</itemPath>
       <itemPath>Indikator.c</itemPath>
+      <itemPath>relay_control.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

@@ -1,18 +1,56 @@
 #include "RS485.h"
+#include "relay_control.h"
 
+#include "high_voltage_control.h"
+#include "address.h"
+#include "frame_types.h"
+#include "CRC16.h"
+#include "mcc_generated_files/memory.h"
 
+#define READ_COILS                  0x01
+#define READ_HOLDING_REGISTERS      0x03
+#define READ_INPUT_REGISTERS        0x04
+#define WRITE_SINGLE_COIL           0x05
+#define WRITE_REGISERS              0x10
 
+#define ERROR_WRONG_FUNCTION        0x01
+#define ERROR_WRONG_REGISTER        0x02
+
+#define ADDRESS                     0
+#define FUNCTION                    1
+
+#define STARTING_ADDRESS_HI         2
+#define STARTING_ADDRESS_LO         3
+#define QUANTITY_OF_COILS_HI        4
+#define QUANTITY_OF_COILS_LO        5
+
+#define QUANTITY_OF_REGISTERS_HI    4
+#define QUANTITY_OF_REGISTERS_LO    5
+
+#define WRITE_STARTING_ADDRESS_HI   6
+#define WRITE_STARTING_ADDRESS_LO   7
+
+#define COIL_VALUE_HI               4
+#define COIL_VALUE_LO               5
+
+#define BYTE_COUNT                  2
+#define COILS_STATUS                3
+
+#define OFF_500V_COIL               0
+#define ON_500V_PLUS_COIL           1
+#define ON_500V_MINUS_COIL          2
+#define ON_GROUND_COIL              3
+#define ON_RELE_COIL                4
 //answer_frame answer;
 
 /* Адреса COILов
  * 
- * 1 ВЫКЛ 500В
- * 2 ВКЛ +500В
- * 3 ВКЛ -500В
- * 4 ЗЕМЛЯ
+ * 0 Откл
+ * 1 Вкл +500В
+ * 2 Вкл -500В
+ * 3 Земля
+ * 4 Релейный выход
  */
-
-
 
 /* Адреса Input Registers для краткого запроса
  *  (всего два измерения: напряжение и споротивление полюса, каждое в одном регистре Modbus )
@@ -57,6 +95,7 @@ extern bool OFF_500V;
 extern bool ON_500V_Plus;
 extern bool ON_500V_Minus;
 extern bool Ground;
+extern bool relay_coil_state;
 union FloatChar
 {
         float fl;
@@ -72,19 +111,17 @@ static bool TXState = false;//состояние передачи
 static uint16_t tempCRC;
 static uint8_t response[42]; 
 
-static uint8_t send_short_ir_answer(uint8_t *request, uint8_t *response );
-static uint8_t send_long_ir_answer(uint8_t *request, uint8_t *response );
-static uint8_t send_device_ir_info(uint8_t *request, uint8_t *response );
-static void read_Calibr_Data(uint8_t *request);
-static void write_Calibr_Data(uint8_t *request);
+static void read_input_registers(uint8_t* receive);
+static uint8_t send_short_ir_answer(uint8_t *request );
+static uint8_t send_long_ir_answer(uint8_t *request );
+static uint8_t send_device_ir_info(uint8_t *request );
+static void read_calibrate_data(uint8_t *request);
+static void write_calibrate_data(uint8_t *request);
+static void read_coil_status(uint8_t* receive);
+static void force_single_coil(uint8_t* receive);
+static void send_error_code(uint8_t* receive, uint8_t err_code);
+static void send(uint8_t *chptr, uint8_t size);
 
-static void send_Coils(uint8_t* receive);
-static void send_Input_Registers(uint8_t* receive);
-static void send_Write_Coil(uint8_t* receive);
-static void send_Error_Code(uint8_t* receive, uint8_t err_code);
-
-// | сюда после срабатывания таймера, то есть после свободности в линии после принятия кадра
-// V размер принятого кадра меньше размера буфера приемника УАРТ
 void recieve_frame(uint8_t size){
     uint8_t request[EUSART1_RX_BUFFER_SIZE], i;
     
@@ -106,77 +143,74 @@ void recieve_frame(uint8_t size){
     switch (request[FUNCTION]){
         case READ_COILS:
         {
-            send_Coils(request);
+            read_coil_status(request);
             break;
         }
         case READ_INPUT_REGISTERS:
         {
-            send_Input_Registers(request);
+            read_input_registers(request);
             break;
         }
         case READ_HOLDING_REGISTERS:
         {
             //чтение коэффициентов калибровки
-            read_Calibr_Data(request);
+            read_calibrate_data(request);
             break;
         }
         case WRITE_SINGLE_COIL:
         {
-            send_Write_Coil(request);
+            force_single_coil(request);
             break;
         }
         case WRITE_REGISERS:
         {
             //запись коэффициентов калибровки
-            write_Calibr_Data(request);
+            write_calibrate_data(request);
             break;
         }
         default:
         {
-            send_Error_Code(request, ERROR_WRONG_FUNCTION);
+            send_error_code(request, ERROR_WRONG_FUNCTION);
             break;
         }
     }
 }
-static void send_Coils(uint8_t *request){
+static void read_coil_status(uint8_t *request){
     //проверим адекватность запроса
-    if (request[STARTING_ADDRESS_LO] > 3 ||
+    if (request[STARTING_ADDRESS_LO] != 0 ||
         request[STARTING_ADDRESS_HI] != 0 ||
-        request[QUANTITY_OF_COILS_LO] < 1 ||
-        request[QUANTITY_OF_COILS_LO] > 4 ||
-        request[QUANTITY_OF_COILS_LO] > (4-request[STARTING_ADDRESS_LO]) ||     
+        request[QUANTITY_OF_COILS_LO] != 4 ||
         request[QUANTITY_OF_COILS_HI] != 0)
     {
-        send_Error_Code(request, ERROR_WRONG_REGISTER);//EXCEPTION_CODE == 2
+        send_error_code(request, ERROR_WRONG_REGISTER);
         return;
     }
-        
-    uint8_t response[6];
+    
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_COILS;
     response[BYTE_COUNT] = 0x01;
-    response[COILS_STATUS] = 0x00 | (Ground<<3) | (ON_500V_Minus<<2) | (ON_500V_Plus<<1) | (OFF_500V<<0);
-    response[COILS_STATUS] >>= request[STARTING_ADDRESS_LO];
-    response[COILS_STATUS] <<= (8 - request[QUANTITY_OF_COILS_LO]);
-    response[COILS_STATUS] >>= (8 - request[QUANTITY_OF_COILS_LO]);
+    response[COILS_STATUS] = 0x00 | (relay_coil_state<<4) | (Ground<<3) | (ON_500V_Minus<<2) | (ON_500V_Plus<<1) | (OFF_500V<<0);
     
-    tempCRC = CRC16(response, sizeof(response)-2);
+    tempCRC = CRC16(response, 4);
     response[4] = (uint8_t)(tempCRC);
     response[5] = (uint8_t)(tempCRC >> 8);
-    send(response, sizeof(response));
+    send(response, 6);
 }
-static void send_Write_Coil(uint8_t *request){
+static void force_single_coil(uint8_t *request){
     //проверим адекватность запроса
-    if (request[STARTING_ADDRESS_LO] > 3 ||
-        request[STARTING_ADDRESS_HI] != 0 ||
-        request[COIL_VALUE_HI] != 0xFF ||
-        request[COIL_VALUE_LO] != 0x00)
+    if (request[STARTING_ADDRESS_LO] > 4 ||
+        request[STARTING_ADDRESS_HI] != 0 )
     {
-        send_Error_Code(request, ERROR_WRONG_REGISTER);
+        send_error_code(request, ERROR_WRONG_REGISTER);
         return;
     }
     switch(request[STARTING_ADDRESS_LO])
     {
+        case ON_RELE_COIL:
+        {
+            switch_relay_coil( request[COIL_VALUE_HI] ) ;
+            break;
+        }    
         case OFF_500V_COIL:
         {
             TurnOFF_500V();
@@ -199,27 +233,28 @@ static void send_Write_Coil(uint8_t *request){
         }
         default:
         {
-            TurnOFF_500V();
-            break;
+            send_error_code(request, ERROR_WRONG_REGISTER);
+            return;
         }
     }
-    
+    /*
+    request[2] = relay_coil_state|0x80;
     tempCRC = CRC16(request, 8-2);
     request[6] = (uint8_t)(tempCRC);
     request[7] = (uint8_t)(tempCRC >> 8);    
+    */
     send(request, 8);
 }
-static void send_Input_Registers(uint8_t *request){
-    //uint8_t response[22];
-    if ( 1 == send_short_ir_answer( request, response) )
+static void read_input_registers(uint8_t *request){
+    if ( 1 == send_short_ir_answer( request) )
         return;
-    if ( 1 == send_long_ir_answer(request, response) )
+    if ( 1 == send_long_ir_answer(request) )
         return;
-    if ( 1 == send_device_ir_info(request, response) )
+    if ( 1 == send_device_ir_info(request) )
         return;
-    send_Error_Code(request, ERROR_WRONG_REGISTER); 
+    send_error_code(request, ERROR_WRONG_REGISTER); 
 }
-static uint8_t send_device_ir_info(uint8_t *request, uint8_t *response ){
+static uint8_t send_device_ir_info(uint8_t *request ){
     if (request[STARTING_ADDRESS_LO] < 0x64 ||
         request[STARTING_ADDRESS_LO] > 0x6A ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
@@ -282,7 +317,7 @@ static uint8_t send_device_ir_info(uint8_t *request, uint8_t *response ){
     send(response, j+3);
     return 1;
 }
-static uint8_t send_short_ir_answer(uint8_t *request, uint8_t *response ){
+static uint8_t send_short_ir_answer(uint8_t *request ){
     if (request[STARTING_ADDRESS_LO] < 0x01 ||
         request[STARTING_ADDRESS_LO] > 0x02 ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
@@ -320,7 +355,7 @@ static uint8_t send_short_ir_answer(uint8_t *request, uint8_t *response ){
     send(response, j+3);
     return 1;
 }
-static uint8_t send_long_ir_answer ( uint8_t *request, uint8_t *response ){
+static uint8_t send_long_ir_answer ( uint8_t *request ){
     
     if (request[STARTING_ADDRESS_LO] < 0x14 ||
         request[STARTING_ADDRESS_LO] > 0x1a ||
@@ -375,28 +410,28 @@ static uint8_t send_long_ir_answer ( uint8_t *request, uint8_t *response ){
     send(response, j+3);
     return 1;
 }
-static void read_Calibr_Data(uint8_t *request) {
+static void read_calibrate_data(uint8_t *request) {
     if (request[STARTING_ADDRESS_LO] != 0x01 ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] != 18 ||
         request[QUANTITY_OF_REGISTERS_HI] != 0)
     {
-        send_Error_Code(request, ERROR_WRONG_REGISTER);
+        send_error_code(request, ERROR_WRONG_REGISTER);
         return;
     }
 
     union FloatChar Upole_coef, Upole_bias, Rpole_coef, Rpole_bias;
-    eeprom_read_object(0x10, &Upole_coef.fl, sizeof(float));
-    eeprom_read_object(0x14, &Upole_bias.fl, sizeof(float));        
-    eeprom_read_object(0x18, &Rpole_coef.fl, sizeof(float));
-    eeprom_read_object(0x1c, &Rpole_bias.fl, sizeof(float));
+    eeprom_read_object(0x00, &Upole_coef.fl, sizeof(float));
+    eeprom_read_object(0x04, &Upole_bias.fl, sizeof(float));        
+    eeprom_read_object(0x08, &Rpole_coef.fl, sizeof(float));
+    eeprom_read_object(0x0c, &Rpole_bias.fl, sizeof(float));
 
     union FloatChar Uion_coef, Uion_bias, Iion_coef, Iion_bias, Iion_coef_less100;
-    eeprom_read_object(0x20, &Uion_coef.fl, sizeof(float));
-    eeprom_read_object(0x24, &Uion_bias.fl, sizeof(float));        
-    eeprom_read_object(0x28, &Iion_coef.fl, sizeof(float));
-    eeprom_read_object(0x2c, &Iion_bias.fl, sizeof(float));
-    eeprom_read_object(0x30, &Iion_coef_less100.fl, sizeof(float));
+    eeprom_read_object(0x10, &Uion_coef.fl, sizeof(float));
+    eeprom_read_object(0x14, &Uion_bias.fl, sizeof(float));        
+    eeprom_read_object(0x18, &Iion_coef.fl, sizeof(float));
+    eeprom_read_object(0x1c, &Iion_bias.fl, sizeof(float));
+    eeprom_read_object(0x20, &Iion_coef_less100.fl, sizeof(float));
   
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
@@ -443,14 +478,14 @@ static void read_Calibr_Data(uint8_t *request) {
     response[40] = (uint8_t)(tempCRC >> 8);
     send(response, 41 );
 }
-static void write_Calibr_Data(uint8_t *request){
+static void write_calibrate_data(uint8_t *request){
     
     if (request[STARTING_ADDRESS_LO] != 0x01 ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] != 18 ||
         request[QUANTITY_OF_REGISTERS_HI] != 0)
     {
-        send_Error_Code(request, ERROR_WRONG_REGISTER);
+        send_error_code(request, ERROR_WRONG_REGISTER);
     }
     //request[6]; //Кол-во байт на передаваемые регистры
     union FloatChar Upole_coef, Upole_bias, Rpole_coef, Rpole_bias;
@@ -470,10 +505,10 @@ static void write_Calibr_Data(uint8_t *request){
     Rpole_bias.ch[1] = request[20];
     Rpole_bias.ch[2] = request[21];
     Rpole_bias.ch[3] = request[22];    
-    eeprom_write_object(0x10, &Upole_coef.fl, sizeof(float));
-    eeprom_write_object(0x14, &Upole_bias.fl, sizeof(float));        
-    eeprom_write_object(0x18, &Rpole_coef.fl, sizeof(float));
-    eeprom_write_object(0x1c, &Rpole_bias.fl, sizeof(float));
+    eeprom_write_object(0x00, &Upole_coef.fl, sizeof(float));
+    eeprom_write_object(0x04, &Upole_bias.fl, sizeof(float));        
+    eeprom_write_object(0x08, &Rpole_coef.fl, sizeof(float));
+    eeprom_write_object(0x0c, &Rpole_bias.fl, sizeof(float));
 
     union FloatChar Uion_coef, Uion_bias, Iion_coef, Iion_bias, Iion_coef_less100;
     Uion_coef.ch[0] = request[23];
@@ -496,11 +531,11 @@ static void write_Calibr_Data(uint8_t *request){
     Iion_coef_less100.ch[1] = request[40];
     Iion_coef_less100.ch[2] = request[41];
     Iion_coef_less100.ch[3] = request[42];
-    eeprom_write_object(0x20, &Uion_coef.fl, sizeof(float));
-    eeprom_write_object(0x24, &Uion_bias.fl, sizeof(float));        
-    eeprom_write_object(0x28, &Iion_coef.fl, sizeof(float));
-    eeprom_write_object(0x2c, &Iion_bias.fl, sizeof(float));
-    eeprom_write_object(0x30, &Iion_coef_less100.fl, sizeof(float));
+    eeprom_write_object(0x10, &Uion_coef.fl, sizeof(float));
+    eeprom_write_object(0x14, &Uion_bias.fl, sizeof(float));        
+    eeprom_write_object(0x18, &Iion_coef.fl, sizeof(float));
+    eeprom_write_object(0x1c, &Iion_bias.fl, sizeof(float));
+    eeprom_write_object(0x20, &Iion_coef_less100.fl, sizeof(float));
     
     response[ADDRESS] = get_addr();
     response[FUNCTION] = WRITE_REGISERS;
@@ -514,7 +549,7 @@ static void write_Calibr_Data(uint8_t *request){
     response[7] = (uint8_t)(tempCRC >> 8);
     send(response, 8);
 }
-static void send_Error_Code(uint8_t *request, uint8_t error_code){
+static void send_error_code(uint8_t *request, uint8_t error_code){
     response[ADDRESS] = get_addr();
     response[1] = (request[FUNCTION] | 0x80);
     response[2] = error_code;
@@ -524,7 +559,7 @@ static void send_Error_Code(uint8_t *request, uint8_t error_code){
     response[4] = (uint8_t)(tempCRC >> 8);
     send(response, 5);
 }
-void send(uint8_t *chptr, uint8_t size){
+static void send(uint8_t *chptr, uint8_t size){
     uint8_t i;
     TX_nRC_SetHigh();//переключаем на передачу
     for (i = 0; i < size; i++){
