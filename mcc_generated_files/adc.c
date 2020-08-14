@@ -51,6 +51,7 @@
 #include <xc.h>
 #include "adc.h"
 #include "device_config.h"
+#include "../measure.h"
 
 
 /**
@@ -67,8 +68,8 @@ void ADC_Initialize(void)
     // NVCFG0 VSS; PVCFG0 external; 
     ADCON1 = 0x04;
     
-    // ADFM left; ACQT 0; ADCS FOSC/64; 
-    ADCON2 = 0x06;
+    // ADFM left; ACQT 2; ADCS FOSC/32; 
+    ADCON2 = 0x0A;
     
     // ADRESL 0; 
     ADRESL = 0x00;
@@ -76,6 +77,8 @@ void ADC_Initialize(void)
     // ADRESH 0; 
     ADRESH = 0x00;
     
+    // Enabling ADC interrupt.
+    PIE1bits.ADIE = 1;
 }
 
 void ADC_SelectChannel(adc_channel_t channel)
@@ -119,7 +122,6 @@ adc_result_t ADC_GetConversion(adc_channel_t channel)
     // Wait for the conversion to finish
     while (ADCON0bits.GO_nDONE)
     {
-        CLRWDT();
     }
 
     // Conversion finished, return the result
@@ -129,6 +131,31 @@ adc_result_t ADC_GetConversion(adc_channel_t channel)
 void ADC_TemperatureAcquisitionDelay(void)
 {
     __delay_us(200);
+}
+
+void ADC_ISR(void)
+{
+    // Clear the ADC interrupt flag
+    PIR1bits.ADIF = 0;
+    
+//    LATCbits.LATC6 = 1;//проверка частоты срабатывания
+    
+    //массив с перечислением номеров каналов
+ static unsigned char ChAddr[3] = {Vin, FB_U, FB_I};
+ static unsigned char NextCh = 0;
+ 
+     //считать результат АЦП
+    AddSample(ADC_GetConversionResult(), ChAddr[NextCh]);
+    //запустить новый цикл оцифровки по новому каналу
+    ADC_SelectChannel(ChAddr[++NextCh]);
+//    ADC_StartConversion();
+    if (NextCh > 2) NextCh = 0;
+    //обработка результата по текущему каналу АЦП
+    
+  
+//    LATCbits.LATC6 = 0;//проверка частоты срабатывания
+    
+    
 }
 /**
  End of File

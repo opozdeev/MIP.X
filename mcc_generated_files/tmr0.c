@@ -73,12 +73,12 @@ void TMR0_Initialize(void)
     // TMR0H 0; 
     TMR0H = 0x00;
 
-    // TMR0L 128; 
-    TMR0L = 0x80;
+    // TMR0L 169; 
+    TMR0L = 0xA9;
 
 	
     // Load TMR0 value to the 8-bit reload variable
-    timer0ReloadVal = 128;
+    timer0ReloadVal = 169;
 
     // Clear Interrupt flag before enabling the interrupt
     INTCONbits.TMR0IF = 0;
@@ -145,21 +145,26 @@ void TMR0_ISR(void)
     }
 
     // add your TMR0 interrupt custom code
-    if (IsTXState())//если идёт прередача
-    {
-        ResetTXState();//выключить статус передачи
-        send_done();//переключиться на приём
-        PIE1bits.TX1IE = 0;
-        TMR0_StopTimer();//выключить Т0
+    if (IsTXState())//если сработал при перередаче
+    {//значит передача закончилась - надо переключится на приём
+//        if (EUSART1_is_tx_done())//и если передача закончена
+        {
+            ResetTXState();//выключить статус передачи
+            send_done();//переключиться на приём
+            PIE1bits.TX1IE = 0;//запрет прерываний передатчика
+            TMR0_StopTimer();//выключить Т0 и считать что линия свободна (хотя это не проверяется никак)
+        }
+//        else TMR0_Initialize();//иначе перезапустим таймер и ждём окончания передачи
     }
     else//если идёт приём
-    {
+    {//если сработал при приёме - значит долго нет данных
         if (!EUSART1_is_RX_buffer_overflow())
             recieve_frame(eusart1RxCount);
         reset_recieve_buffer();
     }
+    
+    
 }
-
 
 void TMR0_SetInterruptHandler(void (* InterruptHandler)(void)){
     TMR0_InterruptHandler = InterruptHandler;

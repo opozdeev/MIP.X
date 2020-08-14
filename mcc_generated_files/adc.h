@@ -191,7 +191,7 @@ void ADC_SelectChannel(adc_channel_t channel);
     convertedValue = ADC_GetConversionResult();
     </code>
 */
-void ADC_StartConversion();
+void ADC_StartConversion(void);
 
 /**
   @Summary
@@ -315,6 +315,22 @@ adc_result_t ADC_GetConversion(adc_channel_t channel);
     </code>
 */
 void ADC_TemperatureAcquisitionDelay(void);
+
+/**
+  @Summary
+    Implements ISR
+
+  @Description
+    This routine is used to implement the ISR for the interrupt-driven
+    implementations.
+
+  @Returns
+    None
+
+  @Param
+    None
+*/
+void ADC_ISR(void);
 
 #ifdef __cplusplus  // Provide C++ Compatibility
 

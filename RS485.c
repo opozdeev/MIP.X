@@ -573,12 +573,12 @@ void send_done(void){
 }
 void save_measure(measures measure){
     // Disable the Global Interrupts
-    INTERRUPT_GlobalInterruptDisable();
+    INTERRUPT_GlobalInterruptHighDisable();//INTERRUPT_GlobalInterruptDisable();
     
     response_measure = measure;
     
     // Enable the Global Interrupts
-    INTERRUPT_GlobalInterruptEnable();
+    INTERRUPT_GlobalInterruptHighEnable();//INTERRUPT_GlobalInterruptEnable();
     // Enable the Peripheral Interrupts
     INTERRUPT_PeripheralInterruptEnable();
 }

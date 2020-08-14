@@ -60,6 +60,7 @@ volatile uint8_t eusart1TxHead = 0;
 volatile uint8_t eusart1TxTail = 0;
 volatile uint8_t eusart1TxBuffer[EUSART1_TX_BUFFER_SIZE];
 volatile uint8_t eusart1TxBufferRemaining;
+
 volatile uint8_t eusart1RxHead = 0;
 volatile uint8_t eusart1RxTail = 0;
 volatile uint8_t eusart1RxBuffer[EUSART1_RX_BUFFER_SIZE];
@@ -122,7 +123,7 @@ void EUSART1_Initialize(void)
     PIE1bits.RC1IE = 1;
 }
 
-void reset_recieve_buffer()
+void reset_recieve_buffer(void)
 {
     eusart1RxHead = 0;
     eusart1RxTail = 0;
@@ -222,17 +223,23 @@ void EUSART1_Transmit_ISR(void)
             eusart1TxTail = 0;
         }
         eusart1TxBufferRemaining++;
-        TMR0_Initialize();//запустить Т0 на случай зависания передачи
+//        TMR0_Initialize();//запустить Т0 на случай зависания передачи
     }
-    else
+    else//если переданны все байты и надо остановить передачу
     {
-        if (EUSART1_is_tx_done())
-        {
-            PIE1bits.TX1IE = 0;
-            send_done();//переключиться на приём
+/*
+        if (EUSART1_is_tx_done())//здесь будет зависать на передаче последнего байта
+        {//если последний байт покинул сдвиговый регистр
+            PIE1bits.TX1IE = 0;//запретим прерывание и будем ждать конца передачи
+
+            send_done();//переключиться на приём - ЭТО не правильно, данные в буфере ещё не переданны
             TMR0_StopTimer();//выключить Т0
-            ResetTXState();//выключить статус передачи
+            ResetTXState();//выключить статус передачи     
+            TMR0_Initialize();//запустить Т0 для определения конца передачи 
         }
+*/
+        PIE1bits.TX1IE = 0;//запретим прерывание передатчика и будем ждать конца передачи
+        TMR0_Initialize();//запустить Т0 для определения конца передачи 
     }
 }
 

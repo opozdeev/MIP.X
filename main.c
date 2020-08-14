@@ -1,7 +1,7 @@
 /**
   Generated Main Source File
 
-  Company:
+ *   Company:
     Microchip Technology Inc.
 
   File Name:
@@ -71,13 +71,13 @@ void main(void)
     // Use the following macros to:
 
     // Enable the Global Interrupts
-    INTERRUPT_GlobalInterruptEnable();
+    INTERRUPT_GlobalInterruptHighEnable();//INTERRUPT_GlobalInterruptEnable();
 
     // Disable the Global Interrupts
     //INTERRUPT_GlobalInterruptDisable();
 
     // Enable the Peripheral Interrupts
-    INTERRUPT_PeripheralInterruptEnable();
+    INTERRUPT_GlobalInterruptLowEnable();//INTERRUPT_PeripheralInterruptEnable();
 
     // Disable the Peripheral Interrupts
     //INTERRUPT_PeripheralInterruptDisable();
@@ -86,10 +86,16 @@ void main(void)
     TX_nRC_SetLow();//переключимся на приём
     
     //read_address();
+ 
+    set_addr(0);
     
     while (1)
     {
+//LATCbits.LATC6 = 1;//проверка частоты срабатывания
         measure = get_measure();//WATCHDOG перезагружается во время работы АЦП
+//LATCbits.LATC6 = 0;//проверка частоты срабатывания
+//        measure.voltage = measure.voltagein;//поменяем местами на время отладки
+        
         save_measure(measure);
         safe_switch(measure.voltage);
         Indik.sData.Hl1 = ~Indik.sData.Hl1;//помигаем светодиодом
@@ -97,7 +103,7 @@ void main(void)
         Indik.sData.AddrLatch = ~Indik.sData.AddrLatch;
         //иногда не выключается передатчик, код дальше должен выключать его, хотя я в этом не уверен до конца
         if ((!IsTXState()) && TX_nRC_GetValue()) TX_nRC_SetLow();//если передавать не надо, но передатчик включен - выключаем передатчик
-        else CLRWDT();
+        CLRWDT();
     };
 }
 

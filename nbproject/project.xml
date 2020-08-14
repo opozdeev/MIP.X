@@ -3,7 +3,7 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>ION</name>
+            <name>MIP</name>
             <creation-uuid>1f2ee77a-546c-4f2e-95a9-40e500c30d64</creation-uuid>
             <make-project-type>0</make-project-type>
             <c-extensions>c</c-extensions>

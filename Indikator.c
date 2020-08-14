@@ -37,3 +37,7 @@ unsigned char get_addr(void)
 {
     return Address;
 }
+void set_addr(unsigned char Addr)
+{
+    Address = Addr;
+}

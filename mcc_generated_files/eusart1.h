@@ -89,8 +89,8 @@ typedef union {
   Section: Macro Declarations
 */
 
-#define EUSART1_TX_BUFFER_SIZE 50
-#define EUSART1_RX_BUFFER_SIZE 50
+#define EUSART1_TX_BUFFER_SIZE 50//29
+#define EUSART1_RX_BUFFER_SIZE 50//37
 
 /**
  Section: Global variables
@@ -127,7 +127,7 @@ void (*EUSART1_RxDefaultInterruptHandler)(void);
 */
 void EUSART1_Initialize(void);
 
-void reset_recieve_buffer();
+void reset_recieve_buffer(void);
 
 /**
   @Summary

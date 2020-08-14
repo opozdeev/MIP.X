@@ -27,6 +27,10 @@ void TurnON_500V_Minus(void)
     ON_500V_Plus = false;
     ON_500V_Minus = false;
     Ground = false;
+    RC4_SetDigitalOutput();
+    RC4_SetLow();
+    RC5_SetDigitalOutput();
+    RC5_SetLow();
 }
 
 void TurnON_500V_Plus(void)
@@ -45,6 +49,10 @@ void TurnON_500V_Plus(void)
     ON_500V_Plus = false;
     ON_500V_Minus = false;
     Ground = false;
+    RC4_SetDigitalOutput();
+    RC4_SetLow();
+    RC5_SetDigitalOutput();
+    RC5_SetLow();
  }
 
 void TurnOFF_500V(void)
@@ -52,10 +60,10 @@ void TurnOFF_500V(void)
     if (OFF_500V)
         return;
     EPWM1_TurnOFF();
-    RC4_SetDigitalOutput();
-    RC4_SetLow();
-    RC5_SetDigitalOutput();
-    RC5_SetLow();
+    RC4_SetDigitalInput();
+ //   RC4_SetLow();
+    RC5_SetDigitalInput();
+//    RC5_SetLow();
     
     Indik.sData.Hl2 = HL2OFF;//ВЫКЛЮЧИМ СВЕТОДИОД
     
@@ -74,10 +82,10 @@ void TurnON_GND(void)
     if (Ground)
         return;
     EPWM1_TurnOFF();
-    RC4_SetDigitalOutput();
-    RC4_SetLow();
-    RC5_SetDigitalOutput();
-    RC5_SetLow();
+    RC4_SetDigitalInput();
+//    RC4_SetLow();
+    RC5_SetDigitalInput();
+//    RC5_SetLow();
      
     Indik.sData.Hl2 = HL2OFF;//ВЫКЛЮЧИМ СВЕТОДИОД
     
@@ -94,11 +102,11 @@ void TurnON_GND(void)
 void safe_switch(float voltage)
 {
     // Disable the Global Interrupts
-    INTERRUPT_GlobalInterruptDisable();
+    INTERRUPT_GlobalInterruptLowDisable();//INTERRUPT_GlobalInterruptDisable();
     
     if (Transition_to_Ground)
     {
-        if (voltage <= 20)
+//        if (voltage <= 20)
         {
 //!!!!!!!!!!!!!!!!!!ВЫКЛЮЧИТЬ МИНУСОВУЮ ПОЛЯРНОСТЬ            OFF_500V_M_SetLow();//включить все реле
 //!!!!!!!!!!!!!!!!!!ВЫКЛЮЧИТЬ ПЛЮСОВУЮ ПОЛЯРНОСТЬ            OFF_500V_P_SetLow();
@@ -117,7 +125,7 @@ void safe_switch(float voltage)
     }
     if (Transition_to_OFF_500V)
     {
-        if (voltage <= 20)
+//        if (voltage <= 20)
         {
 //!!!!!!!!!!!!!!!!!!            OFF_500V_P_SetHigh();//выключить все реле
 //!!!!!!!!!!!!!!!!!!            OFF_500V_M_SetHigh();
@@ -137,7 +145,7 @@ void safe_switch(float voltage)
     
     if (Transition_to_ON_500V_Plus)
     {
-        if (voltage <= 20)
+//        if (voltage <= 20)
         {
 //!!!!!!!!!!!!!!!!            OFF_500V_M_SetHigh(); 
 //!!!!!!!!!!!!!!!!            OFF_500V_P_SetLow();
@@ -157,7 +165,7 @@ void safe_switch(float voltage)
     }
     if (Transition_to_ON_500V_Minus)
     {
-        if (voltage <= 20)
+//        if (voltage <= 20)
         {
 //!!!!!!!!!!!!!!!!!            OFF_500V_P_SetHigh(); 
 //!!!!!!!!!!!!!!!!!            OFF_500V_M_SetLow();
@@ -177,7 +185,7 @@ void safe_switch(float voltage)
     }
     
     // Enable the Global Interrupts
-    INTERRUPT_GlobalInterruptEnable();
+    INTERRUPT_GlobalInterruptLowEnable();//INTERRUPT_GlobalInterruptEnable();
     // Enable the Peripheral Interrupts
-    INTERRUPT_PeripheralInterruptEnable();
+    //INTERRUPT_PeripheralInterruptEnable();
 }

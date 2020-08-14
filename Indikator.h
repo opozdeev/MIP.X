@@ -37,6 +37,7 @@ extern "C" {
     bool WriteOuts(union uIndData Data);
     
     unsigned char get_addr(void);
+    void set_addr(unsigned char Addr);
     
 #ifdef	__cplusplus
 }
