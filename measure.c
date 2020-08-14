@@ -10,12 +10,12 @@ measures get_measure(void)
     float U_coef_calibr, U_bias_calibr, I_above_100_coef_calibr, I_above_100_bias_calibr, I_below_100_coef_calibr, R_bias_calibr, Uin_coef_calibr, Uin_bias_calibr;
     //eeprom_write_object(0x01, &coef_U_calibr, sizeof(coef_U_calibr));
     
-    eeprom_read_object(0x01, &U_coef_calibr, sizeof(float));
-    eeprom_read_object(0x05, &U_bias_calibr, sizeof(float));
-    eeprom_read_object(0x09, &I_above_100_coef_calibr, sizeof(float));
-    eeprom_read_object(0x0D, &I_above_100_bias_calibr, sizeof(float));
-    eeprom_read_object(0x11, &I_below_100_coef_calibr, sizeof(float));
-    eeprom_read_object(0x15, &R_bias_calibr, sizeof(float));
+    eeprom_read_object(0x10, &U_coef_calibr, sizeof(float));
+    eeprom_read_object(0x14, &U_bias_calibr, sizeof(float));
+    eeprom_read_object(0x18, &I_above_100_coef_calibr, sizeof(float));
+    eeprom_read_object(0x1C, &I_above_100_bias_calibr, sizeof(float));
+    eeprom_read_object(0x20, &I_below_100_coef_calibr, sizeof(float));
+    eeprom_read_object(0x0C, &R_bias_calibr, sizeof(float));
     
     uint32_t i, j;
     uint32_t sum_adres_U = 0, sum_adres_I = 0, sum_adres_Uin = 0;
