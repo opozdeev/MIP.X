@@ -89,6 +89,20 @@
  * 0x108,0x109  <- 104
  * 0x10a,0x10b  <- 105
  * 0x10c,0x10d  <- 106  
+ *  
+ */
+/*
+ * Калибровочные коэффициенты храняться по следующи адресам в eepropm
+ * Регистр   |      Описание                       |  Адреса eeprom
+ * 01 (0x01) |  Коэффициент напряжения полюса:     |  0x00 - 0x03
+ * 03 (0х03) |  Смещение напряжения полюса:        |  0x04 - 0x07
+ * 05 (0х05) |  Коэффициент изоляции полюса:       |  0x08 - 0x0b
+ * 07 (0х07) |  Смещение изоляции полюса:          |  0x0c - 0x0f
+ * 09 (0х09) |  Коэффициент напряжения ИОН:        |  0x10 - 0x13
+ * 11 (0х0b) |  Смещение напряжения ИОН:           |  0x14 - 0x17
+ * 13 (0х0d) |  Коэффициент тока ИОН: (>100мкА):   |  0x18 - 0x1b
+ * 15 (0х0f) |  Смещение тока ИОН:                 |  0x1c - 0x1f
+ * 17 (0х11) |  Коэффициент тока ИОН (<100мкА):    |  0x20 - 0x23
  */
 
 extern bool OFF_500V;
@@ -237,12 +251,6 @@ static void force_single_coil(uint8_t *request){
             return;
         }
     }
-    /*
-    request[2] = relay_coil_state|0x80;
-    tempCRC = CRC16(request, 8-2);
-    request[6] = (uint8_t)(tempCRC);
-    request[7] = (uint8_t)(tempCRC >> 8);    
-    */
     send(request, 8);
 }
 static void read_input_registers(uint8_t *request){
@@ -330,8 +338,8 @@ static uint8_t send_short_ir_answer(uint8_t *request ){
     request[STARTING_ADDRESS_LO] = request[STARTING_ADDRESS_LO] - 0x01;    
     
     union REG volt, resist;
-    resist.w = 2578;//(uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
-    volt.w = 5431;//(uint16_t) abs(response_measure.voltagein) * 100;
+    resist.w = (uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
+    volt.w = (uint16_t) abs(response_measure.voltagein) * 100;
     
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
@@ -369,10 +377,10 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     request[STARTING_ADDRESS_LO] = request[STARTING_ADDRESS_LO] - 0x14;
        
     union FloatChar resistance, voltage, current, voltagein;
-    resistance.fl = 2.578;//response_measure.resistance;
-    voltage.fl = 12.55;//response_measure.voltage;
-    current.fl = 345.8;//response_measure.current;
-    voltagein.fl = 54.31;//response_measure.voltagein;
+    resistance.fl = response_measure.resistance;
+    voltage.fl = response_measure.voltage;
+    current.fl = response_measure.current;
+    voltagein.fl = response_measure.voltagein;
         
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_INPUT_REGISTERS;
