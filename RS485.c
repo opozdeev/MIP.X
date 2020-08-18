@@ -15,6 +15,10 @@
 
 #define ERROR_WRONG_FUNCTION        0x01
 #define ERROR_WRONG_REGISTER        0x02
+#define ERROR_WRONG_REQUEST_DATA    0x03
+#define ERROR_WRONG_INTERNAL_DATA   0x04
+
+#define MAX_BYTE_IN_POLE_NAME       30    
 
 #define ADDRESS                     0
 #define FUNCTION                    1
@@ -104,7 +108,15 @@
  * 15 (0х0f) |  Смещение тока ИОН:                 |  0x1c - 0x1f
  * 17 (0х11) |  Коэффициент тока ИОН (<100мкА):    |  0x20 - 0x23
  */
-
+/*
+ * Имя полюса измеряемое данным МИП, храняться в Holding Registers
+ * Регистр     |    Описание                                | Адрес eeprom 
+ * 200 (0xC8)  | Количество байт в строке в кодировке utf8  | 0xC8
+ * 201 (0xC8)  | Байты строки (максимум 30 байт)            | 0xC9 - 0xE7
+ * Примечание
+ * 30 байт - это 15 кирилических символов в utf8 
+ */
+   
 extern bool OFF_500V;
 extern bool ON_500V_Plus;
 extern bool ON_500V_Minus;
@@ -129,8 +141,12 @@ static void read_input_registers(uint8_t* receive);
 static uint8_t send_short_ir_answer(uint8_t *request );
 static uint8_t send_long_ir_answer(uint8_t *request );
 static uint8_t send_device_ir_info(uint8_t *request );
-static void read_calibrate_data(uint8_t *request);
-static void write_calibrate_data(uint8_t *request);
+static void read_holding_registers(uint8_t* receive);
+static uint8_t read_pole_name(uint8_t *request );
+static uint8_t read_calibrate_data(uint8_t *request);
+static void write_registers(uint8_t *request);
+static uint8_t write_calibrate_data(uint8_t *request);
+static uint8_t write_pole_name(uint8_t *request);
 static void read_coil_status(uint8_t* receive);
 static void force_single_coil(uint8_t* receive);
 static void send_error_code(uint8_t* receive, uint8_t err_code);
@@ -167,8 +183,7 @@ void recieve_frame(uint8_t size){
         }
         case READ_HOLDING_REGISTERS:
         {
-            //чтение коэффициентов калибровки
-            read_calibrate_data(request);
+            read_holding_registers(request);
             break;
         }
         case WRITE_SINGLE_COIL:
@@ -179,7 +194,7 @@ void recieve_frame(uint8_t size){
         case WRITE_REGISERS:
         {
             //запись коэффициентов калибровки
-            write_calibrate_data(request);
+            write_registers(request);
             break;
         }
         default:
@@ -418,14 +433,49 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     send(response, j+3);
     return 1;
 }
-static void read_calibrate_data(uint8_t *request) {
+static void read_holding_registers( uint8_t *request ){
+    if ( 1 == read_calibrate_data(request) )
+        return;
+    if ( 1 == read_pole_name(request) )
+        return;
+    send_error_code(request, ERROR_WRONG_REGISTER);
+}
+static uint8_t read_pole_name( uint8_t *request ){
+    if (request[STARTING_ADDRESS_LO] != 0xC8 ||
+        request[STARTING_ADDRESS_HI] != 0x00 ||
+        request[QUANTITY_OF_REGISTERS_LO] > 15 ||
+        request[QUANTITY_OF_REGISTERS_HI] != 0)
+    {
+        return 0;
+    }
+    
+    //200 (0xC8) - количество байт в строке
+    //201-221 (0xC9 - ...)   -   зарезервированная область для хранения строки
+    //30 - максимум строка может содержать 30 байт, - это 15 кирилических символов в utf8
+    uint8_t byte_in_name;
+    eeprom_read_object(0xC8, &byte_in_name, 1 );
+    if (byte_in_name > MAX_BYTE_IN_POLE_NAME){
+        send_error_code(request, ERROR_WRONG_INTERNAL_DATA);    
+        return 1;    
+    }
+       
+    response[ADDRESS] = get_addr();
+    response[FUNCTION] = READ_HOLDING_REGISTERS;
+    response[BYTE_COUNT] = byte_in_name;
+    eeprom_read_object(0xC9, &response[3], byte_in_name );
+    tempCRC = CRC16(response, byte_in_name+3);
+    response[byte_in_name+3] = (uint8_t)(tempCRC);
+    response[byte_in_name+4] = (uint8_t)(tempCRC >> 8);
+    send(response, byte_in_name+5 );
+    return 1;    
+}
+static uint8_t read_calibrate_data(uint8_t *request) {
     if (request[STARTING_ADDRESS_LO] != 0x01 ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] != 18 ||
         request[QUANTITY_OF_REGISTERS_HI] != 0)
     {
-        send_error_code(request, ERROR_WRONG_REGISTER);
-        return;
+        return 0;
     }
 
     union FloatChar Upole_coef, Upole_bias, Rpole_coef, Rpole_bias;
@@ -442,7 +492,7 @@ static void read_calibrate_data(uint8_t *request) {
     eeprom_read_object(0x20, &Iion_coef_less100.fl, sizeof(float));
   
     response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_INPUT_REGISTERS;
+    response[FUNCTION] = READ_HOLDING_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     response[3] = Upole_coef.ch[0];
     response[4] = Upole_coef.ch[1];
@@ -485,15 +535,57 @@ static void read_calibrate_data(uint8_t *request) {
     response[39] = (uint8_t)(tempCRC);
     response[40] = (uint8_t)(tempCRC >> 8);
     send(response, 41 );
+    return 1;
 }
-static void write_calibrate_data(uint8_t *request){
+static void write_registers(uint8_t *request){
+    if (1 == write_calibrate_data(request) )
+        return;
+    if (1 == write_pole_name( request ) )
+        return;    
+    send_error_code(request, ERROR_WRONG_REGISTER);    
+}
+static uint8_t write_pole_name(uint8_t *request){
+    if (request[STARTING_ADDRESS_LO] != 0xC8 ||
+        request[STARTING_ADDRESS_HI] != 0x00 ||
+        request[QUANTITY_OF_REGISTERS_LO] > 15 ||
+        request[QUANTITY_OF_REGISTERS_HI] != 0)
+    {
+        return 0;
+    }
+   
+    //200 (0xC8) - количество байт в строке
+    //201-221 (0xC9 - ...)   -   зарезервированная область для хранения строки
+    //30 - максимум строка может содержать 30 байт, - это 15 кирилических символов в utf8
+    if (request[6] > MAX_BYTE_IN_POLE_NAME ){
+        send_error_code(request, ERROR_WRONG_REQUEST_DATA);    
+        return 1;    
+    }
+        
+    eeprom_write_object(0xC8, &request[6], 1 );
+    eeprom_write_object(0xC9, &request[7], request[6] );
+    //__delay_us(2000);
+       
+    response[ADDRESS] = get_addr();
+    response[FUNCTION] = WRITE_REGISERS;
+    response[2] = request[STARTING_ADDRESS_HI];
+    response[3] = request[STARTING_ADDRESS_LO];
+    response[4] = request[QUANTITY_OF_REGISTERS_HI];
+    response[5] = request[QUANTITY_OF_REGISTERS_LO];
+
+    tempCRC = CRC16(response, 6);
+    response[6] = (uint8_t)(tempCRC);
+    response[7] = (uint8_t)(tempCRC >> 8);
+    send(response, 8);
+    return 1;
+}
+static uint8_t write_calibrate_data(uint8_t *request){
     
     if (request[STARTING_ADDRESS_LO] != 0x01 ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] != 18 ||
         request[QUANTITY_OF_REGISTERS_HI] != 0)
     {
-        send_error_code(request, ERROR_WRONG_REGISTER);
+        return 0;
     }
     //request[6]; //Кол-во байт на передаваемые регистры
     union FloatChar Upole_coef, Upole_bias, Rpole_coef, Rpole_bias;
@@ -556,6 +648,7 @@ static void write_calibrate_data(uint8_t *request){
     response[6] = (uint8_t)(tempCRC);
     response[7] = (uint8_t)(tempCRC >> 8);
     send(response, 8);
+    return 1;
 }
 static void send_error_code(uint8_t *request, uint8_t error_code){
     response[ADDRESS] = get_addr();
