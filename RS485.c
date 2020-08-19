@@ -452,21 +452,26 @@ static uint8_t read_pole_name( uint8_t *request ){
     //200 (0xC8) - количество байт в строке
     //201-221 (0xC9 - ...)   -   зарезервированная область для хранения строки
     //30 - максимум строка может содержать 30 байт, - это 15 кирилических символов в utf8
-    uint8_t byte_in_name;
+    uint8_t byte_in_name = 0;
     eeprom_read_object(0xC8, &byte_in_name, 1 );
     if (byte_in_name > MAX_BYTE_IN_POLE_NAME){
         send_error_code(request, ERROR_WRONG_INTERNAL_DATA);    
         return 1;    
     }
-       
+    uint8_t byte_count = request[QUANTITY_OF_REGISTERS_LO]*2;
     response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_HOLDING_REGISTERS;
-    response[BYTE_COUNT] = byte_in_name;
+    response[BYTE_COUNT] = byte_count;
+    
     eeprom_read_object(0xC9, &response[3], byte_in_name );
-    tempCRC = CRC16(response, byte_in_name+3);
-    response[byte_in_name+3] = (uint8_t)(tempCRC);
-    response[byte_in_name+4] = (uint8_t)(tempCRC >> 8);
-    send(response, byte_in_name+5 );
+    uint8_t i;            
+    for (i=byte_in_name; i < byte_count; ++i ){
+        response[3+i] = 0x00;
+    }
+    tempCRC = CRC16(response, 3+byte_count);
+    response[byte_count+3] = (uint8_t)(tempCRC);
+    response[byte_count+4] = (uint8_t)(tempCRC >> 8);
+    send(response, byte_count+5 );
     return 1;    
 }
 static uint8_t read_calibrate_data(uint8_t *request) {
