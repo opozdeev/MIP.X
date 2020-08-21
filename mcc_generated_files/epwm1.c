@@ -55,7 +55,7 @@
   Section: Macro Declarations
 */
 
-#define PWM1_INITIALIZE_DUTY_VALUE    9
+#define PWM1_INITIALIZE_DUTY_VALUE    10
 
 /**
   Section: EPWM Module APIs
@@ -65,14 +65,14 @@ void EPWM1_Initialize(void)
 {
     // Set the EPWM1 to the options selected in the User Interface
 	
-	// CCP1M P1A,P1C: active high; P1B,P1D: active high; DC1B 1; P1M halfbridge; 
-	CCP1CON = 0x9C;    
+	// CCP1M P1A,P1C: active high; P1B,P1D: active high; DC1B 2; P1M halfbridge; 
+	CCP1CON = 0xAC;    
 	
 	// ECCPASE operating; PSSBD low; PSSAC low; ECCPAS disabled; 
 	ECCP1AS = 0x00;    
 	
-	// PRSEN automatic_restart; PDC 32; 
-	PWM1CON = 0xA0;    
+	// PRSEN automatic_restart; PDC 12; 
+	PWM1CON = 0x8C;    
 	
 	// STRD P1D_to_port; STRC P1C_to_port; STRB P1B_to_CCP1M; STRA P1A_to_CCP1M; STRSYNC start_at_begin; 
 	PSTRCON = 0x03;    

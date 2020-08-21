@@ -84,7 +84,7 @@ void __interrupt() INTERRUPT_InterruptManagerHigh (void)
         //TMR2_ISR();
         PIR1bits.TMR2IF = 0;
         cnt++;
-        cnt &= 0x3;
+        cnt &= 0x7;
         if (cnt == 0) ADC_StartConversion();
     }
     else
