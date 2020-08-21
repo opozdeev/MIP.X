@@ -218,7 +218,14 @@ void eeprom_read_object(unsigned int ee_addr, void *obj_p, size_t obj_size)
         *p++ = DATAEE_ReadByte(ee_addr++);
     }
 }
-
+void eeprom_read_object2(unsigned int ee_addr, void *obj_p, size_t obj_size)
+{
+    unsigned char *p = obj_p;
+    ee_addr += (obj_size-1);
+    while (obj_size--) {
+        *p++ = DATAEE_ReadByte(ee_addr--);
+    }
+}
 void eeprom_write_object(unsigned int ee_addr, void *obj_p, size_t obj_size)
 {
     unsigned char *p = obj_p;

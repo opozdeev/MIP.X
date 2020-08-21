@@ -275,6 +275,7 @@ void DATAEE_WriteByte(uint8_t bAdd, uint8_t bData);
 uint8_t DATAEE_ReadByte(uint8_t bAdd);
 
 void eeprom_read_object(unsigned int ee_addr, void *obj_p, size_t obj_size);
+void eeprom_read_object2(unsigned int ee_addr, void *obj_p, size_t obj_size);
 
 void eeprom_write_object(unsigned int ee_addr, void *obj_p, size_t obj_size);
 
