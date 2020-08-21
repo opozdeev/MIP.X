@@ -19,16 +19,16 @@ measures get_measure(void)
     eeprom_read_object(0x0C, &R_bias_calibr, sizeof(float));
 */
 
-    eeprom_read_object(0x00, &Uin_coef_calibr, sizeof(float));//Uin_coef_calibr
-    eeprom_read_object(0x04, &Uin_bias_calibr, sizeof(float));//Uin_bias_calibr
-    eeprom_read_object(0x08, &R_coef_calibr, sizeof(float));//R_coef_calibr = 1
-    eeprom_read_object(0x0c, &R_bias_calibr, sizeof(float));//R_bias_calibr
+    eeprom_read_object2(0x00, &Uin_coef_calibr, sizeof(float));//Uin_coef_calibr
+    eeprom_read_object2(0x04, &Uin_bias_calibr, sizeof(float));//Uin_bias_calibr
+    eeprom_read_object2(0x08, &R_coef_calibr, sizeof(float));//R_coef_calibr = 1
+    eeprom_read_object2(0x0c, &R_bias_calibr, sizeof(float));//R_bias_calibr
 
-    eeprom_read_object(0x10, &U_coef_calibr, sizeof(float));//U_coef_calibr
-    eeprom_read_object(0x14, &U_bias_calibr, sizeof(float));//U_bias_calibr
-    eeprom_read_object(0x18, &I_above_100_coef_calibr, sizeof(float));//I_above_100_coef_calibr
-    eeprom_read_object(0x1c, &I_above_100_bias_calibr, sizeof(float));//I_above_100_bias_calibr
-    eeprom_read_object(0x20, &I_below_100_coef_calibr, sizeof(float));//I_below_100_coef_calibr
+    eeprom_read_object2(0x10, &U_coef_calibr, sizeof(float));//U_coef_calibr
+    eeprom_read_object2(0x14, &U_bias_calibr, sizeof(float));//U_bias_calibr
+    eeprom_read_object2(0x18, &I_above_100_coef_calibr, sizeof(float));//I_above_100_coef_calibr
+    eeprom_read_object2(0x1c, &I_above_100_bias_calibr, sizeof(float));//I_above_100_bias_calibr
+    eeprom_read_object2(0x20, &I_below_100_coef_calibr, sizeof(float));//I_below_100_coef_calibr
     
     measures measure = {0, 0, 0, 0};
     
