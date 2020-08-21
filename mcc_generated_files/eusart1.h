@@ -90,7 +90,7 @@ typedef union {
 */
 
 #define EUSART1_TX_BUFFER_SIZE 50//29
-#define EUSART1_RX_BUFFER_SIZE 50//37
+#define EUSART1_RX_BUFFER_SIZE 56//37
 
 /**
  Section: Global variables
