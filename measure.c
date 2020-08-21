@@ -1,4 +1,5 @@
 #include "measure.h"
+#include <math.h>
 
 measures get_measure(void)
 {
@@ -7,65 +8,36 @@ measures get_measure(void)
     const float coef_I = ((U_ref/MAX_VAL_ADC) / R_I_fb) * 1000000.0;
     const float coef_Uin = (U_ref/(MAX_VAL_ADC * UIN_div_amp)) * ((UIN_div_high + UIN_div_low) / UIN_div_low);//0.015326439950980392156862745098039
 
-    float U_coef_calibr, U_bias_calibr, I_above_100_coef_calibr, I_above_100_bias_calibr, I_below_100_coef_calibr, R_bias_calibr, Uin_coef_calibr, Uin_bias_calibr;
+    float U_coef_calibr, U_bias_calibr, I_above_100_coef_calibr, I_above_100_bias_calibr, I_below_100_coef_calibr, R_coef_calibr, R_bias_calibr, Uin_coef_calibr, Uin_bias_calibr;
     //eeprom_write_object(0x01, &coef_U_calibr, sizeof(coef_U_calibr));
-    
+/*    
     eeprom_read_object(0x10, &U_coef_calibr, sizeof(float));
     eeprom_read_object(0x14, &U_bias_calibr, sizeof(float));
     eeprom_read_object(0x18, &I_above_100_coef_calibr, sizeof(float));
     eeprom_read_object(0x1C, &I_above_100_bias_calibr, sizeof(float));
     eeprom_read_object(0x20, &I_below_100_coef_calibr, sizeof(float));
     eeprom_read_object(0x0C, &R_bias_calibr, sizeof(float));
-    
-    uint32_t i, j;
-    uint32_t sum_adres_U = 0, sum_adres_I = 0, sum_adres_Uin = 0;
-    adc_result_t I_array[NUM_OF_SAMPLES];
-    adc_result_t U_array[NUM_OF_SAMPLES];
-    adc_result_t Uin_array[NUM_OF_SAMPLES];
+*/
+
+    eeprom_read_object(0x00, &Uin_coef_calibr, sizeof(float));//Uin_coef_calibr
+    eeprom_read_object(0x04, &Uin_bias_calibr, sizeof(float));//Uin_bias_calibr
+    eeprom_read_object(0x08, &R_coef_calibr, sizeof(float));//R_coef_calibr = 1
+    eeprom_read_object(0x0c, &R_bias_calibr, sizeof(float));//R_bias_calibr
+
+    eeprom_read_object(0x10, &U_coef_calibr, sizeof(float));//U_coef_calibr
+    eeprom_read_object(0x14, &U_bias_calibr, sizeof(float));//U_bias_calibr
+    eeprom_read_object(0x18, &I_above_100_coef_calibr, sizeof(float));//I_above_100_coef_calibr
+    eeprom_read_object(0x1c, &I_above_100_bias_calibr, sizeof(float));//I_above_100_bias_calibr
+    eeprom_read_object(0x20, &I_below_100_coef_calibr, sizeof(float));//I_below_100_coef_calibr
     
     measures measure = {0, 0, 0, 0};
     
     if (!update_calibr_coef)
-    {
-        
         update_calibr_coef = true;
-    }
- /*
-    for (j = 0; j < MEAN_NUM; j++)
-    {
-        for (i = 0; i < NUM_OF_SAMPLES; i++)
-        {
-            U_array[i] = ADC_GetConversion(FB_U);            
-        }
-        __delay_us(10);
-        for (i = 0; i < NUM_OF_SAMPLES; i++)
-        {
-            I_array[i] = ADC_GetConversion(FB_I);
-        }
-        __delay_us(10);
-        for (i = 0; i < NUM_OF_SAMPLES; i++)
-        {
-            Uin_array[i] = ADC_GetConversion(Vin);
-        }
-       
-        I_array[MEDIAN] = mean(I_array, NUM_OF_SAMPLES);//bubble_sort(I_array, NUM_OF_SAMPLES);//qsort(I_array, NUM_OF_SAMPLES, sizeof(adc_result_t), (adc_result_t(*) (const void *, const void *)) comp);
-        U_array[MEDIAN] =  mean(U_array, NUM_OF_SAMPLES);//bubble_sort(U_array, NUM_OF_SAMPLES);//qsort(U_array, NUM_OF_SAMPLES, sizeof(adc_result_t), (adc_result_t(*) (const void *, const void *)) comp);
-        Uin_array[MEDIAN] =  mean(Uin_array, NUM_OF_SAMPLES);
-        
-
-        sum_adres_I += I_array[MEDIAN];
-        sum_adres_U += U_array[MEDIAN];
-        sum_adres_Uin += Uin_array[MEDIAN];
      
-    }
- */
-    sum_adres_I = GetSampleMean(2);
-    sum_adres_U = GetSampleMean(1);
-    sum_adres_Uin = GetSampleMean(0);
+    measure.voltage = U_coef_calibr * (coef_U * GetSampleMean(FB_U) - U_bias_calibr);
     
-    measure.voltage = U_coef_calibr * (coef_U * sum_adres_U/* / MEAN_NUM*/ - U_bias_calibr);
-    
-    measure.current = (sum_adres_I/* / MEAN_NUM*/) * coef_I;
+    measure.current = GetSampleMean(FB_I) * coef_I;
     
 /*    if (measure.current < (100 * measure.voltage / 500.0))
     {
@@ -86,7 +58,9 @@ measures get_measure(void)
         measure.current = 0;
     }
     */    
-    measure.voltagein = /*Uin_coef_calibr * */(coef_Uin * (sum_adres_Uin/* / MEAN_NUM*/ - MAX_VAL_ADC / 2) - I_below_100_coef_calibr/* - Uin_bias_calibr*/);
+    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleMean(Vin) - Uin_bias_calibr);//измерение постоянки
+//    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleRms() - Uin_bias_calibr);//измерение переменки (средняя сумма квадратов)
+    
 /*
     if (measure.voltagein < 0)
     {
@@ -145,48 +119,64 @@ unsigned short mean(unsigned short* Data, unsigned int Size)
 }
 
 static adc_result_t SampleMean[3] = {0,0,0};
+static float SampleRMS = 0;
 
-#define NUM_SAMPLES 256
+#define NUM_SAMPLES 4166//2048//256//число отсчётов должно быть кратно периоду измеряемого сигнала
 
 void AddSample(adc_result_t Sample, unsigned char Ch)
 {
  static unsigned short SampleCount[3] = {0,0,0};
- static unsigned long Sum[3] = {0,0,0};
+ static unsigned long SumMean[3] = {0,0,0};
+ static unsigned long long SumPower2 = 0;
+ static short TmpRes;
     switch (Ch)
     {
         case Vin:  
-            
-            Sum[0] += Sample;
+            /* Среднее
+            SumMean[0] += Sample;
             SampleCount[0]++;
-            if (SampleCount[0] > NUM_SAMPLES)
+            if (SampleCount[0] >= NUM_SAMPLES)
             {
-                SampleMean[0] = Sum[0] /NUM_SAMPLES;
+                SampleMean[0] = SumMean[0] /NUM_SAMPLES;
                 SampleCount[0] = 0;
-                Sum[0] = 0;
+                SumMean[0] = 0;
+            }
+            */
+            TmpRes = (((long)(Sample)) & 0xffff) - 65472/2;
+            SumPower2 +=  TmpRes *  TmpRes;
+            SumMean[0] += TmpRes;
+            SampleCount[0]++;
+            if (SampleCount[0] >= NUM_SAMPLES)
+            {
+                SampleRMS = sqrtf(SumPower2 / NUM_SAMPLES);
+                SampleMean[0] = SumMean[0] /NUM_SAMPLES;
+                SampleCount[0] = 0;
+                SumPower2 = 0;
+                SumMean[0] = 0;
             }
             break;
         case FB_U: 
 
-            Sum[1] += Sample;
+            SumMean[1] += Sample;
             SampleCount[1]++;
-            if (SampleCount[1] > NUM_SAMPLES)
+            if (SampleCount[1] >= NUM_SAMPLES)
             {
 //            LATCbits.LATC6 = 1;//проверка частоты срабатывания                
-                SampleMean[1] = Sum[1] /NUM_SAMPLES;
+                SampleMean[1] = SumMean[1] /NUM_SAMPLES;
                 SampleCount[1] = 0;
-                Sum[1] = 0;
+                SumMean[1] = 0;
 //            LATCbits.LATC6 = 0;//проверка частоты срабатывания                
             }
             break;
         case FB_I:   
             
-            Sum[2] += Sample;
+            SumMean[2] += Sample;
             SampleCount[2]++;
-            if (SampleCount[2] > NUM_SAMPLES)
+            if (SampleCount[2] >= NUM_SAMPLES)
             {
-                SampleMean[2] = Sum[2] /NUM_SAMPLES;
+                SampleMean[2] = SumMean[2] /NUM_SAMPLES;
                 SampleCount[2] = 0;
-                Sum[2] = 0;
+                SumMean[2] = 0;
             }
             break;
     }
@@ -194,5 +184,17 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
 
 adc_result_t GetSampleMean(unsigned char Ch)
 {
-    return SampleMean[Ch];
+    switch (Ch)
+    {
+        case Vin:
+            return SampleMean[0];
+        case FB_U:
+            return SampleMean[1];
+        case FB_I:
+            return SampleMean[2];
+    }
+}
+float GetSampleRms()
+{
+    return SampleRMS;
 }

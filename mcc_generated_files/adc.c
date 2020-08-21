@@ -68,8 +68,8 @@ void ADC_Initialize(void)
     // NVCFG0 VSS; PVCFG0 external; 
     ADCON1 = 0x04;
     
-    // ADFM left; ACQT 8; ADCS FOSC/32; 
-    ADCON2 = 0x22;
+    // ADFM left; ACQT 16; ADCS FOSC/32; 
+    ADCON2 = 0x32;
     
     // ADRESL 0; 
     ADRESL = 0x00;
@@ -146,12 +146,15 @@ void ADC_ISR(void)
  
      //считать результат АЦП
     AddSample(ADC_GetConversionResult(), ChAddr[NextCh]);
-    //запустить новый цикл оцифровки по новому каналу
-    ADC_SelectChannel(ChAddr[++NextCh]);
-//    ADC_StartConversion();
-    if (NextCh > 2) NextCh = 0;
-    //обработка результата по текущему каналу АЦП
-    
+
+    NextCh++;
+    if (NextCh > 2)
+    {
+        NextCh = 0;
+    }
+
+    ADC_SelectChannel(ChAddr[NextCh]);//для тестирования
+      
   
 //    LATCbits.LATC6 = 0;//проверка частоты срабатывания
     

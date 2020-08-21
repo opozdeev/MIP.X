@@ -54,6 +54,7 @@ void main(void)
     extern union uIndData Indik;
     // Initialize the device
     SYSTEM_Initialize();
+    ADC_SelectChannel(Vin);//подключим к АЦП канал напряжения полюса
 
     //настройка регистра управления
     LATCH_SetLow();//запретим защёлкивание данных в регистр управления

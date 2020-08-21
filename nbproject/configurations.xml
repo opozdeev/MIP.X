@@ -69,7 +69,7 @@
         <targetDevice>PIC18F14K50</targetDevice>
         <targetHeader></targetHeader>
         <targetPluginBoard></targetPluginBoard>
-        <platformTool>pk4hybrid</platformTool>
+        <platformTool>noID</platformTool>
         <languageToolchain>XC8</languageToolchain>
         <languageToolchainVersion>2.20</languageToolchainVersion>
         <platform>3</platform>
@@ -110,22 +110,22 @@
         <property key="default-bitfield-type" value="true"/>
         <property key="default-char-type" value="true"/>
         <property key="define-macros" value=""/>
-        <property key="disable-optimizations" value="true"/>
+        <property key="disable-optimizations" value="false"/>
         <property key="extra-include-directories" value=""/>
         <property key="favor-optimization-for" value="-speed,+space"/>
         <property key="garbage-collect-data" value="true"/>
         <property key="garbage-collect-functions" value="true"/>
         <property key="identifier-length" value="255"/>
         <property key="local-generation" value="false"/>
-        <property key="operation-mode" value="free"/>
+        <property key="operation-mode" value="pro"/>
         <property key="opt-xc8-compiler-strict_ansi" value="false"/>
         <property key="optimization-assembler" value="true"/>
         <property key="optimization-assembler-files" value="true"/>
         <property key="optimization-debug" value="false"/>
         <property key="optimization-invariant-enable" value="false"/>
         <property key="optimization-invariant-value" value="16"/>
-        <property key="optimization-level" value="-O0"/>
-        <property key="optimization-speed" value="false"/>
+        <property key="optimization-level" value="-O3"/>
+        <property key="optimization-speed" value="true"/>
         <property key="optimization-stable-enable" value="false"/>
         <property key="pack-struct" value="true"/>
         <property key="preprocess-assembler" value="true"/>
@@ -159,8 +159,8 @@
         <property key="data-model-size-of-float-gcc" value="no-short-float"/>
         <property key="display-class-usage" value="false"/>
         <property key="display-hex-usage" value="false"/>
-        <property key="display-overall-usage" value="true"/>
-        <property key="display-psect-usage" value="true"/>
+        <property key="display-overall-usage" value="false"/>
+        <property key="display-psect-usage" value="false"/>
         <property key="extra-lib-directories" value=""/>
         <property key="fill-flash-options-addr" value=""/>
         <property key="fill-flash-options-const" value=""/>
@@ -271,8 +271,6 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-3fff"/>
         <property key="poweroptions.powerenable" value="true"/>
-        <property key="programmerToGoFilePath"
-                  value="/home/boris/MPLABXProjects/MIP/ION.X/debug/default/ION_ptg"/>
         <property key="programmerToGoImageName" value="ION_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>
