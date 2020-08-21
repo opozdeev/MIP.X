@@ -129,8 +129,8 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
 {
  static unsigned short SampleCount[3] = {0,0,0};
  static long SumMean[3] = {0,0,0};
- static unsigned long long SumPower2 = 0;
- static short TmpRes;
+ static long long SumPower2 = 0;//64-bit
+ static long long TmpRes;
     switch (Ch)
     {
         case Vin:  
@@ -144,8 +144,8 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
                 SumMean[0] = 0;
             }
             */
-            TmpRes = (short)Sample - 65472/2;
-            SumPower2 +=  TmpRes *  TmpRes;
+            TmpRes = (short)(Sample - 65472/2);//убираем смещение (ref/2)
+            SumPower2 +=  TmpRes *  TmpRes;//16-bit * 16-bit = 32-bit => 64-bit
             SumMean[0] += TmpRes;
             SampleCount[0]++;
             if (SampleCount[0] >= NUM_SAMPLES)
@@ -186,17 +186,32 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
 
 short GetSampleMean(unsigned char Ch)
 {
+    short Tmp = 0;
     switch (Ch)
     {
         case Vin:
-            return SampleMean[0];
+            INTERRUPT_GlobalInterruptLowDisable();
+            Tmp = SampleMean[0];
+            INTERRUPT_GlobalInterruptLowEnable();
+            break;
         case FB_U:
-            return SampleMean[1];
+            INTERRUPT_GlobalInterruptLowDisable();
+            Tmp = SampleMean[1];
+            INTERRUPT_GlobalInterruptLowEnable();
+            break;
         case FB_I:
-            return SampleMean[2];
+            INTERRUPT_GlobalInterruptLowDisable();
+            Tmp = SampleMean[2];
+            INTERRUPT_GlobalInterruptLowEnable();
+            break;
     }
+    return Tmp;
 }
 float GetSampleRms()
 {
-    return SampleRMS;
+    float Tmp;
+    INTERRUPT_GlobalInterruptLowDisable();
+    Tmp = SampleRMS;
+    INTERRUPT_GlobalInterruptLowEnable();
+    return Tmp;
 }

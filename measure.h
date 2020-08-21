@@ -33,7 +33,7 @@ measures get_measure(void);
 unsigned short mean(unsigned short* Data, unsigned int Size);
 void AddSample(adc_result_t Sample, unsigned char Ch);
 short GetSampleMean(unsigned char Ch);
-float GetSampleRms();
+float GetSampleRms(void);
 
 
 #endif	/* MEASURE_H */
