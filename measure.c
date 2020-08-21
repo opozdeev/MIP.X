@@ -35,9 +35,11 @@ measures get_measure(void)
     if (!update_calibr_coef)
         update_calibr_coef = true;
      
-    measure.voltage = U_coef_calibr * (coef_U * GetSampleMean(FB_U) - U_bias_calibr);
+    unsigned short TmpValue = GetSampleMean(FB_U);
+    measure.voltage = U_coef_calibr * (coef_U * TmpValue/*GetSampleMean(FB_U)*/ - U_bias_calibr);
     
-    measure.current = GetSampleMean(FB_I) * coef_I;
+    TmpValue = GetSampleMean(FB_I);
+    measure.current = TmpValue /*GetSampleMean(FB_I)*/ * coef_I;
     
 /*    if (measure.current < (100 * measure.voltage / 500.0))
     {
@@ -58,8 +60,8 @@ measures get_measure(void)
         measure.current = 0;
     }
     */    
-    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleMean(Vin) - Uin_bias_calibr);//измерение постоянки
-//    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleRms() - Uin_bias_calibr);//измерение переменки (средняя сумма квадратов)
+//    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleMean(Vin) - Uin_bias_calibr);//измерение постоянки
+    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleRms() - Uin_bias_calibr);//измерение переменки (средняя сумма квадратов)
     
 /*
     if (measure.voltagein < 0)
@@ -118,7 +120,7 @@ unsigned short mean(unsigned short* Data, unsigned int Size)
     return Sum/Size;
 }
 
-static adc_result_t SampleMean[3] = {0,0,0};
+static /*adc_result_t*/short SampleMean[3] = {0,0,0};
 static float SampleRMS = 0;
 
 #define NUM_SAMPLES 4166//2048//256//число отсчётов должно быть кратно периоду измеряемого сигнала
@@ -126,7 +128,7 @@ static float SampleRMS = 0;
 void AddSample(adc_result_t Sample, unsigned char Ch)
 {
  static unsigned short SampleCount[3] = {0,0,0};
- static unsigned long SumMean[3] = {0,0,0};
+ static long SumMean[3] = {0,0,0};
  static unsigned long long SumPower2 = 0;
  static short TmpRes;
     switch (Ch)
@@ -142,7 +144,7 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
                 SumMean[0] = 0;
             }
             */
-            TmpRes = (((long)(Sample)) & 0xffff) - 65472/2;
+            TmpRes = (short)Sample - 65472/2;
             SumPower2 +=  TmpRes *  TmpRes;
             SumMean[0] += TmpRes;
             SampleCount[0]++;
@@ -182,7 +184,7 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
     }
 }
 
-adc_result_t GetSampleMean(unsigned char Ch)
+short GetSampleMean(unsigned char Ch)
 {
     switch (Ch)
     {
