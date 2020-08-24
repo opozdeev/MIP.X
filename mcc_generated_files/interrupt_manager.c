@@ -84,8 +84,12 @@ void __interrupt() INTERRUPT_InterruptManagerHigh (void)
         //TMR2_ISR();
         PIR1bits.TMR2IF = 0;
         cnt++;
-        cnt &= 0x7;
-        if (cnt == 0) ADC_StartConversion();
+        cnt &= 0xF;//0x3F;
+        if (cnt == 0) 
+        {
+            ADCON0bits.GO_nDONE = 1;//start conversion
+//            LATBbits.LATB6 = ~LATBbits.LATB6;
+        }
     }
     else
     {
@@ -112,9 +116,8 @@ void __interrupt(low_priority) INTERRUPT_InterruptManagerLow (void)
     }
     else if(PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
     {
-//        LATCbits.LATC6 = 1;//проверка частоты срабатывания
+//        LATBbits.LATB6 = ~LATBbits.LATB6;
         ADC_ISR();
-//        LATCbits.LATC6 = 0;//проверка частоты срабатывания
     }
     else
     {

@@ -34,11 +34,25 @@ measures get_measure(void)
     
     if (!update_calibr_coef)
         update_calibr_coef = true;
-     
-    unsigned short TmpValue = GetSampleMean(FB_U);
-    measure.voltage = U_coef_calibr * (coef_U * TmpValue/*GetSampleMean(FB_U)*/ - U_bias_calibr);
+   
     
-    TmpValue = GetSampleMean(FB_I);
+ unsigned short TmpValue;
+    
+    if (IsResultReady(2))
+    {
+        TmpValue = GetResult(2) / NUM_SAMPLES;//GetSampleMean(FB_U);
+        measure.voltage = U_coef_calibr * (coef_U * TmpValue - U_bias_calibr);
+/*
+    if (measure.voltage < 0)
+    {
+        measure.voltage = 0;
+    }
+*/
+    }
+    
+    if (IsResultReady(3))
+    {
+    TmpValue = GetResult(3) / NUM_SAMPLES;//GetSampleMean(FB_I);
     measure.current = TmpValue /*GetSampleMean(FB_I)*/ * coef_I;
     
 /*    if (measure.current < (100 * measure.voltage / 500.0))
@@ -50,18 +64,26 @@ measures get_measure(void)
         measure.current = I_above_100_coef_calibr * (measure.current - I_above_100_bias_calibr);
 /*    }*/
     /*
-    if (measure.voltage < 0)
-    {
-        measure.voltage = 0;
-    }
     
     if (measure.current < 0)
     {
         measure.current = 0;
     }
     */    
-//    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleMean(Vin) - Uin_bias_calibr);//измерение постоянки
-    measure.voltagein = Uin_coef_calibr * (coef_Uin * GetSampleRms() - Uin_bias_calibr);//измерение переменки (средняя сумма квадратов)
+    }
+ float VoltageInDc;
+ short VoltageInDcInt;
+
+        if (IsResultReady(1))//проверяем готовность данных по каналу DC напряжения полюса
+        {
+            /*measure.voltagein*/VoltageInDc = GetResult(1) / NUM_SAMPLES;// /*Uin_coef_calibr * (coef_Uin * */GetSampleMean(Vin)/* - Uin_bias_calibr)*/;//измерение постоянки
+            VoltageInDcInt = VoltageInDc;
+        }
+    
+        if (IsResultReady(0))//проверяем готовность данных по каналу RMS
+        {
+            measure.voltagein = sqrtf(((long)(GetResult(0) / NUM_SAMPLES)) - VoltageInDcInt * VoltageInDcInt);// /*Uin_coef_calibr * (coef_Uin * */GetSampleRms()/* - Uin_bias_calibr)*/;//измерение переменки (средняя сумма квадратов)
+        }
     
 /*
     if (measure.voltagein < 0)
@@ -71,16 +93,16 @@ measures get_measure(void)
 */    
     if (measure.voltage > 50)//проверим что напряжение ИОНа достаточно для измерения сопротивления
     {
-        measure.resistance = (measure.voltage / measure.current) - R_bias_calibr;
+//на время тестирования        measure.resistance = (measure.voltage / measure.current) - R_bias_calibr;
 
 //        if (measure.resistance < 0) measure.resistance = 0;
     }
     else 
     {
         unsigned long tmp = 0xff800000;
-        measure.resistance = (float) tmp;//отправим -inf
+//на время тестирования        measure.resistance = (float) tmp;//отправим -inf
     }
-        
+measure.resistance = VoltageInDc;//на время тестирования        
     return measure;
 }
 /* функция для сортировки отсчётов */
@@ -123,35 +145,28 @@ unsigned short mean(unsigned short* Data, unsigned int Size)
 static /*adc_result_t*/short SampleMean[3] = {0,0,0};
 static float SampleRMS = 0;
 
-#define NUM_SAMPLES 4166//2048//256//число отсчётов должно быть кратно периоду измеряемого сигнала
+//#define NUM_SAMPLES (1565/3)//4166//2048//256//число отсчётов должно быть кратно периоду измеряемого сигнала
 
 void AddSample(adc_result_t Sample, unsigned char Ch)
 {
  static unsigned short SampleCount[3] = {0,0,0};
- static long SumMean[3] = {0,0,0};
- static long long SumPower2 = 0;//64-bit
- static long long TmpRes;
+ static long SumMean[3] = {0,0,0}, TmpRMS;
+ static long SumPower2 = 0;//64-bit
+ static /*long long*/ short TmpRes;
+ 
     switch (Ch)
     {
         case Vin:  
-            /* Среднее
-            SumMean[0] += Sample;
+//            LATBbits.LATB6 = ~LATBbits.LATB6;//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            TmpRes = (short)((Sample) - (1024/2));//убираем смещение (ref/2)
+            SumPower2 += (TmpRes<<2) * (TmpRes<<2);//10-bit * 10-bit = 20-bit => 64-bit //накопление для RMS
+            SumMean[0] += (TmpRes<<2);//накопление для среднего
             SampleCount[0]++;
             if (SampleCount[0] >= NUM_SAMPLES)
             {
-                SampleMean[0] = SumMean[0] /NUM_SAMPLES;
-                SampleCount[0] = 0;
-                SumMean[0] = 0;
-            }
-            */
-            TmpRes = (short)(Sample - 65472/2);//убираем смещение (ref/2)
-            SumPower2 +=  TmpRes *  TmpRes;//16-bit * 16-bit = 32-bit => 64-bit
-            SumMean[0] += TmpRes;
-            SampleCount[0]++;
-            if (SampleCount[0] >= NUM_SAMPLES)
-            {
-                SampleRMS = sqrtf(SumPower2 / NUM_SAMPLES);
-                SampleMean[0] = SumMean[0] /NUM_SAMPLES;
+                SaveResult(SumPower2, 0);//переписать во временное хранилище для дальнейшего расчёта//SampleMean[0] = SumMean[0] /NUM_SAMPLES;
+                SaveResult(SumMean[0], 1);//переписать во временное хранилище для дальнейшего расчёта//TmpRMS = (long)(SumPower2 / NUM_SAMPLES) - SampleMean[0] * SampleMean[0];
+                //sqrtf(TmpRMS);
                 SampleCount[0] = 0;
                 SumPower2 = 0;
                 SumMean[0] = 0;
@@ -164,7 +179,7 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
             if (SampleCount[1] >= NUM_SAMPLES)
             {
 //            LATCbits.LATC6 = 1;//проверка частоты срабатывания                
-                SampleMean[1] = SumMean[1] /NUM_SAMPLES;
+                SaveResult(SumMean[1], 2);//SampleMean[1] = SumMean[1] /NUM_SAMPLES;
                 SampleCount[1] = 0;
                 SumMean[1] = 0;
 //            LATCbits.LATC6 = 0;//проверка частоты срабатывания                
@@ -176,7 +191,7 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
             SampleCount[2]++;
             if (SampleCount[2] >= NUM_SAMPLES)
             {
-                SampleMean[2] = SumMean[2] /NUM_SAMPLES;
+                SaveResult(SumMean[2], 3);//SampleMean[2] = SumMean[2] /NUM_SAMPLES;
                 SampleCount[2] = 0;
                 SumMean[2] = 0;
             }
@@ -214,4 +229,29 @@ float GetSampleRms()
     Tmp = SampleRMS;
     INTERRUPT_GlobalInterruptLowEnable();
     return Tmp;
+}
+static long MesArray[4] = {0,0,0,0};//в массиве будем хранить данные для дальнейших вычислений
+static bool ValueUsed[4] = {true, true, true, true};
+/*
+ *  Пытаемся сохранить результат измерений
+ * Если сохранение не удалось - возвращаем false
+ */
+bool SaveResult(long Value, unsigned char Pos)
+{
+    if (ValueUsed[Pos])
+    {
+        MesArray[Pos] = Value;
+        ValueUsed[Pos] = false;
+        return true;
+    }
+    else return false;
+}
+long GetResult(unsigned char Pos)
+{
+    ValueUsed[Pos] = true;
+    return MesArray[Pos];
+}
+bool IsResultReady(unsigned char Pos)
+{
+    return ~ValueUsed[Pos];
 }
