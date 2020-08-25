@@ -36,11 +36,11 @@ measures get_measure(void)
         update_calibr_coef = true;
    
     
- unsigned short TmpValue;
+ /*unsigned short*/float TmpValue;
     
     if (IsResultReady(2))
     {
-        TmpValue = GetResult(2) / NUM_SAMPLES;//GetSampleMean(FB_U);
+        TmpValue = GetResult(2) / ((float)NUM_SAMPLES);//GetSampleMean(FB_U);
         measure.voltage = U_coef_calibr * (coef_U * TmpValue - U_bias_calibr);
 /*
     if (measure.voltage < 0)
@@ -52,7 +52,7 @@ measures get_measure(void)
     
     if (IsResultReady(3))
     {
-    TmpValue = GetResult(3) / NUM_SAMPLES;//GetSampleMean(FB_I);
+    TmpValue = GetResult(3) / ((float)NUM_SAMPLES);//GetSampleMean(FB_I);
     measure.current = TmpValue /*GetSampleMean(FB_I)*/ * coef_I;
     
 /*    if (measure.current < (100 * measure.voltage / 500.0))
@@ -76,13 +76,13 @@ measures get_measure(void)
 
         if (IsResultReady(1))//проверяем готовность данных по каналу DC напряжения полюса
         {
-            /*measure.voltagein*/VoltageInDc = GetResult(1) / NUM_SAMPLES;// /*Uin_coef_calibr * (coef_Uin * */GetSampleMean(Vin)/* - Uin_bias_calibr)*/;//измерение постоянки
+            /*measure.voltagein*/VoltageInDc = GetResult(1) / ((float)NUM_SAMPLES);// /*Uin_coef_calibr * (coef_Uin * */GetSampleMean(Vin)/* - Uin_bias_calibr)*/;//измерение постоянки
             VoltageInDcInt = VoltageInDc;
         }
     
         if (IsResultReady(0))//проверяем готовность данных по каналу RMS
         {
-            measure.voltagein = sqrtf(((long)(GetResult(0) / NUM_SAMPLES)) - VoltageInDcInt * VoltageInDcInt);// /*Uin_coef_calibr * (coef_Uin * */GetSampleRms()/* - Uin_bias_calibr)*/;//измерение переменки (средняя сумма квадратов)
+            measure.voltagein = Uin_coef_calibr * (coef_Uin * sqrtf(GetResult(0) / ((float)NUM_SAMPLES) - VoltageInDc * VoltageInDc) - Uin_bias_calibr);//измерение переменки (средняя сумма квадратов)
         }
     
 /*
@@ -105,11 +105,13 @@ measures get_measure(void)
 measure.resistance = VoltageInDc;//на время тестирования        
     return measure;
 }
+//---------------------------------------------------------------------------------------------
 /* функция для сортировки отсчётов */
 adc_result_t comp (const adc_result_t *i, const adc_result_t *j)
 {
     return *i - *j;
 }
+//---------------------------------------------------------------------------------------------
 /* функция сортировки отсчётов */
 void bubble_sort(adc_result_t list[], int8_t n)
 {
@@ -131,7 +133,7 @@ void bubble_sort(adc_result_t list[], int8_t n)
     }
   }
 }
-
+//---------------------------------------------------------------------------------------------
 unsigned short mean(unsigned short* Data, unsigned int Size)
 {
     unsigned int i;
@@ -141,7 +143,7 @@ unsigned short mean(unsigned short* Data, unsigned int Size)
         Sum += Data[i];
     return Sum/Size;
 }
-
+//---------------------------------------------------------------------------------------------
 static /*adc_result_t*/short SampleMean[3] = {0,0,0};
 static float SampleRMS = 0;
 
@@ -150,17 +152,17 @@ static float SampleRMS = 0;
 void AddSample(adc_result_t Sample, unsigned char Ch)
 {
  static unsigned short SampleCount[3] = {0,0,0};
- static long SumMean[3] = {0,0,0}, TmpRMS;
- static long SumPower2 = 0;//64-bit
- static /*long long*/ short TmpRes;
+ static long SumMean[3] = {0,0,0};
+ static long SumPower2 = 0;//32-bit
+ static /*short*/ long TmpRes;
  
     switch (Ch)
     {
         case Vin:  
 //            LATBbits.LATB6 = ~LATBbits.LATB6;//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            TmpRes = (short)((Sample) - (1024/2));//убираем смещение (ref/2)
-            SumPower2 += (TmpRes<<2) * (TmpRes<<2);//10-bit * 10-bit = 20-bit => 64-bit //накопление для RMS
-            SumMean[0] += (TmpRes<<2);//накопление для среднего
+            TmpRes = (short)(Sample) - (0x3FF/2);//убираем смещение (ref/2)
+            SumPower2 += TmpRes * TmpRes;//10-bit * 10-bit = 20-bit => 64-bit //накопление для RMS
+            SumMean[0] += TmpRes;//накопление для среднего
             SampleCount[0]++;
             if (SampleCount[0] >= NUM_SAMPLES)
             {
@@ -198,7 +200,7 @@ void AddSample(adc_result_t Sample, unsigned char Ch)
             break;
     }
 }
-
+//---------------------------------------------------------------------------------------------
 short GetSampleMean(unsigned char Ch)
 {
     short Tmp = 0;
@@ -222,6 +224,7 @@ short GetSampleMean(unsigned char Ch)
     }
     return Tmp;
 }
+//---------------------------------------------------------------------------------------------
 float GetSampleRms()
 {
     float Tmp;
@@ -230,27 +233,36 @@ float GetSampleRms()
     INTERRUPT_GlobalInterruptLowEnable();
     return Tmp;
 }
+//---------------------------------------------------------------------------------------------
 static long MesArray[4] = {0,0,0,0};//в массиве будем хранить данные для дальнейших вычислений
 static bool ValueUsed[4] = {true, true, true, true};
 /*
- *  Пытаемся сохранить результат измерений
- * Если сохранение не удалось - возвращаем false
+ * Сохраним результат измерений
+ * Если если предыдущее сохранение было считано - возвращаем false (пока непонятный функционал)
  */
 bool SaveResult(long Value, unsigned char Pos)
 {
+    MesArray[Pos] = Value;
     if (ValueUsed[Pos])
     {
-        MesArray[Pos] = Value;
         ValueUsed[Pos] = false;
         return true;
     }
     else return false;
 }
+//---------------------------------------------------------------------------------------------
+/*
+ возвращает результат измерений и устанавливает флаг использованности результата измерений
+ */
 long GetResult(unsigned char Pos)
 {
     ValueUsed[Pos] = true;
     return MesArray[Pos];
 }
+//---------------------------------------------------------------------------------------------
+/* 
+ если результат измерений готов - возвращает true 
+ */
 bool IsResultReady(unsigned char Pos)
 {
     return ~ValueUsed[Pos];

@@ -59,6 +59,8 @@ void  INTERRUPT_Initialize (void)
     // TMRI - high priority
     IPR1bits.TMR2IP = 1;
 
+    // ADI - high priority
+    IPR1bits.ADIP = 1;
 
     // RCI - low priority
     IPR1bits.RC1IP = 0;    
@@ -68,9 +70,6 @@ void  INTERRUPT_Initialize (void)
 
     // TXI - low priority
     IPR1bits.TX1IP = 0;    
-
-    // ADI - low priority
-    IPR1bits.ADIP = 0;    
 
 }
 
@@ -90,6 +89,11 @@ void __interrupt() INTERRUPT_InterruptManagerHigh (void)
             ADCON0bits.GO_nDONE = 1;//start conversion
 //            LATBbits.LATB6 = ~LATBbits.LATB6;
         }
+    }
+    else if(PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
+    {
+                    LATBbits.LATB6 = ~LATBbits.LATB6;
+        ADC_ISR();
     }
     else
     {
@@ -113,11 +117,6 @@ void __interrupt(low_priority) INTERRUPT_InterruptManagerLow (void)
     else if(PIE1bits.TX1IE == 1 && PIR1bits.TX1IF == 1)
     {
         EUSART1_TxDefaultInterruptHandler();
-    }
-    else if(PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
-    {
-//        LATBbits.LATB6 = ~LATBbits.LATB6;
-        ADC_ISR();
     }
     else
     {

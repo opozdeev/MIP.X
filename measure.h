@@ -26,7 +26,7 @@ typedef struct
 #define MEAN_NUM        256
 #define MEDIAN          7
 
-#define NUM_SAMPLES (2088/4)//число отсчётов должно быть кратно периоду измеряемого сигнала
+#define NUM_SAMPLES (5797/6) //(2088/4)//число отсчётов должно быть кратно периоду измеряемого сигнала
 
 adc_result_t comp (const adc_result_t *, const adc_result_t *);
 void bubble_sort(adc_result_t list[], int8_t n);
