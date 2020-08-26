@@ -20,13 +20,13 @@ bool WriteOuts(union uIndData Data)
         SCK_SetLow();
         SDO_LAT = Data.ucData & 1;
         Data.ucData >>= 1;
-        __delay_us(10);
+        __delay_us(1);
         SCK_SetHigh();
-        __delay_us(10);
+        __delay_us(1);
     }
     SCK_SetLow();
     LATCH_SetHigh();
-    __delay_us(10);
+    __delay_us(1);
     LATCH_SetLow();
     if (!NeedReadAddr) Address = ~tmpAddress;//если нужно читать адрес
     return !NeedReadAddr;//переключим состояние чтения адреса

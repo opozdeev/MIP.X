@@ -13,7 +13,7 @@ extern "C" {
 #endif
 #include "stdint.h"
 
-uint8_t get_version (); 
+uint8_t get_version (void); 
 
 
 #ifdef	__cplusplus

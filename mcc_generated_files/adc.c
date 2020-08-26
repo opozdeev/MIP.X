@@ -68,8 +68,8 @@ void ADC_Initialize(void)
     // NVCFG0 VSS; PVCFG0 external; 
     ADCON1 = 0x04;
     
-    // ADFM left; ACQT 16; ADCS FOSC/32; 
-    ADCON2 = 0x32;
+    // ADFM right; ACQT 16; ADCS FOSC/32; 
+    ADCON2 = 0xB2;
     
     // ADRESL 0; 
     ADRESL = 0x00;
@@ -93,6 +93,7 @@ void ADC_StartConversion()
 {
     // Start the conversion
     ADCON0bits.GO_nDONE = 1;
+//    LATBbits.LATB6 = ~LATBbits.LATB6;
 }
 
 
@@ -138,13 +139,13 @@ void ADC_ISR(void)
     // Clear the ADC interrupt flag
     PIR1bits.ADIF = 0;
     
-//    LATCbits.LATC6 = 1;//проверка частоты срабатывания
-    
     //массив с перечислением номеров каналов
  static unsigned char ChAddr[3] = {Vin, FB_U, FB_I};
  static unsigned char NextCh = 0;
  
      //считать результат АЦП
+ 
+//    LATBbits.LATB6 = ~LATBbits.LATB6;
     AddSample(ADC_GetConversionResult(), ChAddr[NextCh]);
 
     NextCh++;
@@ -152,13 +153,7 @@ void ADC_ISR(void)
     {
         NextCh = 0;
     }
-
     ADC_SelectChannel(ChAddr[NextCh]);//для тестирования
-      
-  
-//    LATCbits.LATC6 = 0;//проверка частоты срабатывания
-    
-    
 }
 /**
  End of File

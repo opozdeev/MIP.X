@@ -119,9 +119,9 @@ void TMR2_LoadPeriodRegister(uint8_t periodVal)
    PR2 = periodVal;
 }
 
-void TMR2_ISR(void)
+void TMR2_ISR(void)//не вызывается, см. код в interrupt_manager.c
 {
-    static volatile unsigned int CountCallBack = 0;
+    static volatile unsigned char CountCallBack = 0;
 
     // clear the TMR2 interrupt flag
     PIR1bits.TMR2IF = 0;
@@ -135,7 +135,7 @@ void TMR2_ISR(void)
         // reset ticker counter
         CountCallBack = 0;
     }
-    }
+}
 
 void TMR2_CallBack(void)
 {
@@ -153,6 +153,7 @@ void TMR2_CallBack(void)
     //запустить новый цикл оцифровки по новому каналу
     ADC_SelectChannel(ChAddr[++NextCh]);
 */ 
+
     ADC_StartConversion();
 /*
     if (NextCh > 2) NextCh = 0;

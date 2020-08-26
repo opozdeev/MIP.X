@@ -59,6 +59,8 @@ void  INTERRUPT_Initialize (void)
     // TMRI - high priority
     IPR1bits.TMR2IP = 1;
 
+    // ADI - high priority
+    IPR1bits.ADIP = 1;
 
     // RCI - low priority
     IPR1bits.RC1IP = 0;    
@@ -68,9 +70,6 @@ void  INTERRUPT_Initialize (void)
 
     // TXI - low priority
     IPR1bits.TX1IP = 0;    
-
-    // ADI - low priority
-    IPR1bits.ADIP = 0;    
 
 }
 
@@ -84,8 +83,17 @@ void __interrupt() INTERRUPT_InterruptManagerHigh (void)
         //TMR2_ISR();
         PIR1bits.TMR2IF = 0;
         cnt++;
-        cnt &= 0x7;
-        if (cnt == 0) ADC_StartConversion();
+        cnt &= 0xF;//0x3F;
+        if (cnt == 0) 
+        {
+            ADCON0bits.GO_nDONE = 1;//start conversion
+//            LATBbits.LATB6 = ~LATBbits.LATB6;
+        }
+    }
+    else if(PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
+    {
+//                    LATBbits.LATB6 = ~LATBbits.LATB6;
+        ADC_ISR();
     }
     else
     {
@@ -109,12 +117,6 @@ void __interrupt(low_priority) INTERRUPT_InterruptManagerLow (void)
     else if(PIE1bits.TX1IE == 1 && PIR1bits.TX1IF == 1)
     {
         EUSART1_TxDefaultInterruptHandler();
-    }
-    else if(PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
-    {
-//        LATCbits.LATC6 = 1;//проверка частоты срабатывания
-        ADC_ISR();
-//        LATCbits.LATC6 = 0;//проверка частоты срабатывания
     }
     else
     {
