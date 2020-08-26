@@ -137,6 +137,7 @@ static measures response_measure;
 static bool TXState = false;//состояние передачи
 static uint16_t tempCRC;
 static uint8_t response[42]; 
+static uint8_t i, j;
 
 static void read_input_registers(uint8_t* receive);
 static uint8_t send_short_ir_answer(uint8_t *request );
@@ -271,22 +272,31 @@ static void force_single_coil(uint8_t *request){
     send(request, 8);
 }
 static void read_input_registers(uint8_t *request){
-    response[FUNCTION] = READ_INPUT_REGISTERS;
-    if ( 1 == send_short_ir_answer( request) )
-        return;
-    if ( 1 == send_long_ir_answer(request) )
-        return;
-    if ( 1 == send_device_ir_info(request) )
-        return;
+    if ( request[STARTING_ADDRESS_HI] == 0x00 && request[QUANTITY_OF_REGISTERS_HI] == 0 )
+    {
+        response[FUNCTION] = READ_INPUT_REGISTERS;
+        if ( 1 == send_short_ir_answer( request) )
+            return;
+        if ( 1 == send_long_ir_answer(request) )
+            return;
+        if ( 1 == send_device_ir_info(request) )
+            return;
+    }
     send_error_code(request, ERROR_WRONG_REGISTER); 
+}
+static void split_response(uint8_t const *request, uint8_t *response){
+    j = 2;
+    for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
+    {
+        j++;
+        response[j] = response[i];
+    }
 }
 static uint8_t send_device_ir_info(uint8_t *request ){
     if (request[STARTING_ADDRESS_LO] < 0x64 ||
         request[STARTING_ADDRESS_LO] > 0x6A ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] < 1 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 7 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] > 7 )
     {
         return 0;
     }
@@ -319,8 +329,8 @@ static uint8_t send_device_ir_info(uint8_t *request ){
     response[15] = number_of_calibrate.b[0];
     response[16] = number_of_calibrate.b[1];
     
-    uint8_t i, j;
-    j = 2;
+    
+    //j = split_response (request, response );
     for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
     {
         j++;
@@ -336,10 +346,8 @@ static uint8_t send_device_ir_info(uint8_t *request ){
 static uint8_t send_short_ir_answer(uint8_t *request ){
     if (request[STARTING_ADDRESS_LO] < 0x01 ||
         request[STARTING_ADDRESS_LO] > 0x02 ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] < 1 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 2 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0 )
+        request[QUANTITY_OF_REGISTERS_LO] > 2  )
     {
         return 0;
     }
@@ -355,7 +363,6 @@ static uint8_t send_short_ir_answer(uint8_t *request ){
     response[5] = resist.b[1];
     response[6] = resist.b[0];
 
-    uint8_t i, j;
     j = 2;
     for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
     {
@@ -370,13 +377,10 @@ static uint8_t send_short_ir_answer(uint8_t *request ){
     return 1;
 }
 static uint8_t send_long_ir_answer ( uint8_t *request ){
-    
     if (request[STARTING_ADDRESS_LO] < 0x14 ||
         request[STARTING_ADDRESS_LO] > 0x1a ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] < 1 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 8 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] > 8 )
     {
         return 0;
     }
@@ -406,7 +410,6 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     response[17] = voltage.ch[1];
     response[18] = voltage.ch[0];
     
-    uint8_t i, j;
     j = 2;
     for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
     {
@@ -423,18 +426,20 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     return 1;
 }
 static void read_holding_registers( uint8_t *request ){
-    response[FUNCTION] = READ_HOLDING_REGISTERS;
-    if ( 1 == read_calibrate_data(request) )
-        return;
-    if ( 1 == read_pole_name(request) )
-        return;
+
+    if ( request[STARTING_ADDRESS_HI] == 0x00 && request[QUANTITY_OF_REGISTERS_HI] == 0 )
+    {
+        response[FUNCTION] = READ_HOLDING_REGISTERS;
+        if ( 1 == read_calibrate_data(request) )
+            return;
+        if ( 1 == read_pole_name(request) )
+            return;
+    }
     send_error_code(request, ERROR_WRONG_REGISTER);
 }
 static uint8_t read_pole_name( uint8_t *request ){
     if (request[STARTING_ADDRESS_LO] != 0xC8 ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 15 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] > 15 )
     {
         return 0;
     }
@@ -449,7 +454,7 @@ static uint8_t read_pole_name( uint8_t *request ){
     response[BYTE_COUNT] = byte_count;
     
     eeprom_read_object(0xC9, &response[3], byte_in_name );
-    uint8_t i;            
+        
     for (i=byte_in_name; i < byte_count; ++i ){
         response[3+i] = 0x00;
     }
@@ -461,9 +466,7 @@ static uint8_t read_pole_name( uint8_t *request ){
 }
 static uint8_t read_calibrate_data(uint8_t *request) {
     if (request[STARTING_ADDRESS_LO] != 0x01 ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
-        request[QUANTITY_OF_REGISTERS_LO] != 18 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] != 18 )
     {
         return 0;
     }
@@ -486,22 +489,21 @@ static uint8_t read_calibrate_data(uint8_t *request) {
     return 1;
 }
 static void write_registers(uint8_t *request){
-    if (1 == write_calibrate_data(request) )
-        return;
-    if (1 == write_pole_name( request ) )
-        return;    
-    if (1 == write_mip_info( request ) )
-        return;    
-
+    if ( request[STARTING_ADDRESS_HI] == 0x00 && request[QUANTITY_OF_REGISTERS_HI] == 0 ){
+        response[FUNCTION] = WRITE_REGISERS; 
+        if (1 == write_calibrate_data(request) )
+            return;
+        if (1 == write_pole_name( request ) )
+            return;    
+        if (1 == write_mip_info( request ) )
+            return;    
+    }
     send_error_code(request, ERROR_WRONG_REGISTER);    
 }
-
 static uint8_t write_mip_info(uint8_t *request){
-    response[FUNCTION] = WRITE_REGISERS;    
+       
     if (request[STARTING_ADDRESS_LO] != 0x64 ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
-        request[QUANTITY_OF_REGISTERS_LO] != 3 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] != 3 )
     {
         return 0;
     }
@@ -523,9 +525,7 @@ static uint8_t write_mip_info(uint8_t *request){
 }
 static uint8_t write_pole_name(uint8_t *request){
     if (request[STARTING_ADDRESS_LO] != 0xC8 ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
-        request[QUANTITY_OF_REGISTERS_LO] > 15 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] > 15 )
     {
         return 0;
     }
@@ -556,9 +556,7 @@ static uint8_t write_pole_name(uint8_t *request){
 static uint8_t write_calibrate_data(uint8_t *request){
     
     if (request[STARTING_ADDRESS_LO] != 0x01 ||
-        request[STARTING_ADDRESS_HI] != 0x00 ||
-        request[QUANTITY_OF_REGISTERS_LO] != 21 ||
-        request[QUANTITY_OF_REGISTERS_HI] != 0)
+        request[QUANTITY_OF_REGISTERS_LO] != 21 )
     {
         return 0;
     }
