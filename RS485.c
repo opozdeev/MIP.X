@@ -171,6 +171,7 @@ void recieve_frame(uint8_t size){
     
     if (request[ADDRESS] != get_addr())
         return;
+    response[ADDRESS] = request[ADDRESS];
     
     switch (request[FUNCTION]){
         case READ_COILS:
@@ -217,7 +218,6 @@ static void read_coil_status(uint8_t *request){
         return;
     }
     
-    response[ADDRESS] = get_addr();
     response[FUNCTION] = READ_COILS;
     response[BYTE_COUNT] = 0x01;
     response[COILS_STATUS] = 0x00 | (relay_coil_state<<4) | (Ground<<3) | (ON_500V_Minus<<2) | (ON_500V_Plus<<1) | (OFF_500V<<0);
@@ -271,6 +271,7 @@ static void force_single_coil(uint8_t *request){
     send(request, 8);
 }
 static void read_input_registers(uint8_t *request){
+    response[FUNCTION] = READ_INPUT_REGISTERS;
     if ( 1 == send_short_ir_answer( request) )
         return;
     if ( 1 == send_long_ir_answer(request) )
@@ -302,8 +303,6 @@ static uint8_t send_device_ir_info(uint8_t *request ){
     eeprom_read_object( 0xF0, &next_calibrate.w, sizeof(uint16_t) );
     eeprom_read_object( 0xF2, &number_of_calibrate.w, sizeof(uint16_t) );
                     
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_INPUT_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     response[3] = hard_ver.b[0];
     response[4] = hard_ver.b[1];
@@ -350,8 +349,6 @@ static uint8_t send_short_ir_answer(uint8_t *request ){
     resist.w = (uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
     volt.w = (uint16_t) abs(response_measure.voltagein) * 100;
     
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_INPUT_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     response[3] = volt.b[1];
     response[4] = volt.b[0];
@@ -391,8 +388,6 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     current.fl = response_measure.current;
     voltagein.fl = response_measure.voltagein;
         
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_INPUT_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     response[3] = voltagein.ch[3];
     response[4] = voltagein.ch[2];
@@ -428,6 +423,7 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     return 1;
 }
 static void read_holding_registers( uint8_t *request ){
+    response[FUNCTION] = READ_HOLDING_REGISTERS;
     if ( 1 == read_calibrate_data(request) )
         return;
     if ( 1 == read_pole_name(request) )
@@ -450,8 +446,6 @@ static uint8_t read_pole_name( uint8_t *request ){
         return 1;    
     }
     uint8_t byte_count = request[QUANTITY_OF_REGISTERS_LO]*2;
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_HOLDING_REGISTERS;
     response[BYTE_COUNT] = byte_count;
     
     eeprom_read_object(0xC9, &response[3], byte_in_name );
@@ -474,8 +468,6 @@ static uint8_t read_calibrate_data(uint8_t *request) {
         return 0;
     }
 
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = READ_HOLDING_REGISTERS;
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;    
     eeprom_read_object(0x00, &response[3], sizeof(float)); //Upole_coef
     eeprom_read_object(0x04, &response[7], sizeof(float)); //Upole_bias        
@@ -503,7 +495,9 @@ static void write_registers(uint8_t *request){
 
     send_error_code(request, ERROR_WRONG_REGISTER);    
 }
+
 static uint8_t write_mip_info(uint8_t *request){
+    response[FUNCTION] = WRITE_REGISERS;    
     if (request[STARTING_ADDRESS_LO] != 0x64 ||
         request[STARTING_ADDRESS_HI] != 0x00 ||
         request[QUANTITY_OF_REGISTERS_LO] != 3 ||
@@ -516,13 +510,11 @@ static uint8_t write_mip_info(uint8_t *request){
     eeprom_write_object( 0xEA, &request[9], sizeof(uint16_t) ); //порядковый номер в серии (старшие два байта)
     eeprom_write_object( 0xEC, &request[11], sizeof(uint16_t) ); //порядковый номер в серии (младшие два байта)
     
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = WRITE_REGISERS;
     response[2] = request[STARTING_ADDRESS_HI];
     response[3] = request[STARTING_ADDRESS_LO];
     response[4] = request[QUANTITY_OF_REGISTERS_HI];
     response[5] = request[QUANTITY_OF_REGISTERS_LO];
-
+    
     tempCRC = CRC16(response, 6);
     response[6] = (uint8_t)(tempCRC);
     response[7] = (uint8_t)(tempCRC >> 8);
@@ -550,8 +542,6 @@ static uint8_t write_pole_name(uint8_t *request){
     eeprom_write_object(0xC9, &request[7], request[6] );
     //__delay_us(2000);
        
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = WRITE_REGISERS;
     response[2] = request[STARTING_ADDRESS_HI];
     response[3] = request[STARTING_ADDRESS_LO];
     response[4] = request[QUANTITY_OF_REGISTERS_HI];
@@ -588,9 +578,6 @@ static uint8_t write_calibrate_data(uint8_t *request){
     eeprom_write_object( 0xF0, &request[45], sizeof(uint16_t) ); //месяц следущей калибровки (1223 -> декабрь 2023)
     eeprom_write_object( 0xF2, &request[47], sizeof(uint16_t) ); //общее количесво пройденых калибровок
     
-    
-    response[ADDRESS] = get_addr();
-    response[FUNCTION] = WRITE_REGISERS;
     response[2] = request[STARTING_ADDRESS_HI];
     response[3] = request[STARTING_ADDRESS_LO];
     response[4] = request[QUANTITY_OF_REGISTERS_HI];
@@ -603,7 +590,6 @@ static uint8_t write_calibrate_data(uint8_t *request){
     return 1;
 }
 static void send_error_code(uint8_t *request, uint8_t error_code){
-    response[ADDRESS] = get_addr();
     response[1] = (request[FUNCTION] | 0x80);
     response[2] = error_code;
     
