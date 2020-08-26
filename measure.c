@@ -106,6 +106,7 @@ measure.resistance = VoltageInDc;//на время тестирования
     return measure;
 }
 //---------------------------------------------------------------------------------------------
+/*
 /* функция для сортировки отсчётов */
 adc_result_t comp (const adc_result_t *i, const adc_result_t *j)
 {
@@ -124,7 +125,7 @@ void bubble_sort(adc_result_t list[], int8_t n)
     {
       if (list[d] > list[d+1])
       {
-        /* Swapping */
+        //Swapping
  
         t         = list[d];
         list[d]   = list[d+1];

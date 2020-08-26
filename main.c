@@ -100,7 +100,7 @@ void main(void)
         save_measure(measure);
         safe_switch(measure.voltage);
         Indik.sData.Hl1 = ~Indik.sData.Hl1;//помигаем светодиодом
-//        WriteOuts(Indik);//обновим содержимое регистра управления и считаем адрес если нужно
+        WriteOuts(Indik);//обновим содержимое регистра управления и считаем адрес если нужно
         Indik.sData.AddrLatch = ~Indik.sData.AddrLatch;
         //иногда не выключается передатчик, код дальше должен выключать его, хотя я в этом не уверен до конца
         if ((!IsTXState()) && TX_nRC_GetValue()) TX_nRC_SetLow();//если передавать не надо, но передатчик включен - выключаем передатчик

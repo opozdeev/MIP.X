@@ -92,7 +92,7 @@ void __interrupt() INTERRUPT_InterruptManagerHigh (void)
     }
     else if(PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
     {
-                    LATBbits.LATB6 = ~LATBbits.LATB6;
+//                    LATBbits.LATB6 = ~LATBbits.LATB6;
         ADC_ISR();
     }
     else
