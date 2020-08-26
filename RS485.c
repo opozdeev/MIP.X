@@ -128,6 +128,7 @@ union FloatChar
         float fl;
         uint8_t ch[4];
 };
+
 union REG
 {
         uint16_t w;
@@ -135,7 +136,6 @@ union REG
 };
 static measures response_measure;
 static bool TXState = false;//состояние передачи
-static uint16_t tempCRC;
 static uint8_t response[42]; 
 static uint8_t i, j;
 
@@ -220,9 +220,6 @@ static void read_coil_status(uint8_t *request){
     response[BYTE_COUNT] = 0x01;
     response[COILS_STATUS] = 0x00 | (relay_coil_state<<4) | (Ground<<3) | (ON_500V_Minus<<2) | (ON_500V_Plus<<1) | (OFF_500V<<0);
     
-    tempCRC = CRC16(response, 4);
-    response[4] = (uint8_t)(tempCRC);
-    response[5] = (uint8_t)(tempCRC >> 8);
     send(response, 6);
 }
 static void force_single_coil(uint8_t *request){
@@ -265,6 +262,7 @@ static void force_single_coil(uint8_t *request){
             return;
         }
     }
+    /*тут не было расчента crc он по идее должен будет сейчас пересчитать crc*/
     send(request, 8);
 }
 static void read_input_registers(uint8_t *request){
@@ -279,6 +277,8 @@ static void read_input_registers(uint8_t *request){
 }
 
 static uint8_t split_response(uint8_t const *request, uint8_t *response){
+    //3 + request[STARTING_ADDRESS_LO]*2; // откуда
+    //3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]; // докуда
     j = 2;
     for(i = 3 + request[STARTING_ADDRESS_LO]*2; i < 3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]*2; i++)
     {
@@ -327,9 +327,6 @@ static uint8_t send_device_ir_info(uint8_t *request ){
     
     j = split_response (request, response );
     
-    tempCRC = CRC16(response, j+1);
-    response[j+1] = (uint8_t)(tempCRC);
-    response[j+2] = (uint8_t)(tempCRC >> 8);
     send(response, j+3);
     return 1;
 }
@@ -355,9 +352,6 @@ static uint8_t send_short_ir_answer(uint8_t *request ){
 
     j = split_response (request, response );
     
-    tempCRC = CRC16(response, j+1);
-    response[j+1] = (uint8_t)(tempCRC);
-    response[j+2] = (uint8_t)(tempCRC >> 8);
     send(response, j+3);
     return 1;
 }
@@ -396,12 +390,7 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
     response[18] = voltage.ch[0];
     
     j = split_response (request, response );
-    
-    //3 + request[STARTING_ADDRESS_LO]*2; // откуда
-    //3 + request[STARTING_ADDRESS_LO]*2 + request[QUANTITY_OF_REGISTERS_LO]; // докуда
-    tempCRC = CRC16(response, j+1);
-    response[j+1] = (uint8_t)(tempCRC);
-    response[j+2] = (uint8_t)(tempCRC >> 8);
+ 
     send(response, j+3);
     return 1;
 }
@@ -435,9 +424,6 @@ static uint8_t read_pole_name( uint8_t *request ){
     for (i=byte_in_name; i < byte_count; ++i ){
         response[3+i] = 0x00;
     }
-    tempCRC = CRC16(response, 3+byte_count);
-    response[byte_count+3] = (uint8_t)(tempCRC);
-    response[byte_count+4] = (uint8_t)(tempCRC >> 8);
     send(response, byte_count+5 );
     return 1;    
 }
@@ -447,7 +433,6 @@ static uint8_t read_calibrate_data(uint8_t *request) {
     {
         return 0;
     }
-
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;    
     eeprom_read_object(0x00, &response[3], sizeof(float)); //Upole_coef
     eeprom_read_object(0x04, &response[7], sizeof(float)); //Upole_bias        
@@ -459,9 +444,6 @@ static uint8_t read_calibrate_data(uint8_t *request) {
     eeprom_read_object(0x18, &response[27], sizeof(float)); //Iion_coef
     eeprom_read_object(0x1c, &response[31], sizeof(float)); //Iion_bias 
     eeprom_read_object(0x20, &response[35], sizeof(float)); //Iion_coef_less100            
-    tempCRC = CRC16(response, 39);
-    response[39] = (uint8_t)(tempCRC);
-    response[40] = (uint8_t)(tempCRC >> 8);
     send(response, 41 );
     return 1;
 }
@@ -492,9 +474,6 @@ static uint8_t write_mip_info(uint8_t *request){
     response[4] = 0x00; //так как отказались от проверки STARTING_ADDRESS_HI на равенство нулю, в угоду оптимизации
     response[5] = request[QUANTITY_OF_REGISTERS_LO];
     
-    tempCRC = CRC16(response, 6);
-    response[6] = (uint8_t)(tempCRC);
-    response[7] = (uint8_t)(tempCRC >> 8);
     send(response, 8);
     return 1;
 }
@@ -522,10 +501,6 @@ static uint8_t write_pole_name(uint8_t *request){
     response[4] = 0x00;
     response[5] = request[QUANTITY_OF_REGISTERS_LO];
 
-    tempCRC = CRC16(response, 6);
-    response[6] = (uint8_t)(tempCRC);
-    response[7] = (uint8_t)(tempCRC >> 8);
-    send(response, 8);
     return 1;
 }
 static uint8_t write_calibrate_data(uint8_t *request){
@@ -556,24 +531,21 @@ static uint8_t write_calibrate_data(uint8_t *request){
     response[4] = 0x00;
     response[5] = request[QUANTITY_OF_REGISTERS_LO];
 
-    tempCRC = CRC16(response, 6);
-    response[6] = (uint8_t)(tempCRC);
-    response[7] = (uint8_t)(tempCRC >> 8);
     send(response, 8);
     return 1;
 }
 static void send_error_code(uint8_t *request, uint8_t error_code){
     response[1] = (request[FUNCTION] | 0x80);
     response[2] = error_code;
-    
-    uint16_t tempCRC = CRC16(response, 3 );
-    response[3] = (uint8_t)(tempCRC);
-    response[4] = (uint8_t)(tempCRC >> 8);
     send(response, 5);
 }
 static void send(uint8_t *chptr, uint8_t size){
-
-    TX_nRC_SetHigh();//переключаем на передачу
+    /*Расчитаем CRC для пакета данных*/
+    uint16_t tempCRC = CRC16(response, size-2 );
+    response[size-2] = (uint8_t)(tempCRC);
+    response[size-1] = (uint8_t)(tempCRC >> 8);
+    /*Произведем передачу*/
+    TX_nRC_SetHigh();
     for (i = 0; i < size; i++){
         EUSART1_Write(*chptr++);
         //__delay_us(100);
