@@ -134,6 +134,7 @@ union REG
         uint16_t w;
         uint8_t b[2];
 };
+
 static measures response_measure;
 static bool TXState = false;//состояние передачи
 static uint8_t response[42]; 
@@ -219,7 +220,6 @@ static void read_coil_status(uint8_t *request){
     response[FUNCTION] = READ_COILS;
     response[BYTE_COUNT] = 0x01;
     response[COILS_STATUS] = 0x00 | (relay_coil_state<<4) | (Ground<<3) | (ON_500V_Minus<<2) | (ON_500V_Plus<<1) | (OFF_500V<<0);
-    
     send(response, 6);
 }
 static void force_single_coil(uint8_t *request){
@@ -296,7 +296,8 @@ static uint8_t send_device_ir_info(uint8_t *request ){
         return 0;
     }
     request[STARTING_ADDRESS_LO] -= 0x64;
-   
+    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
+    
     union REG hard_ver, serial_number_hight, serial_number_low, soft_ver;
     eeprom_read_object( 0xE8, &hard_ver.w, sizeof(uint16_t) );
     eeprom_read_object( 0xEA, &serial_number_hight.w, sizeof(uint16_t) );
@@ -307,8 +308,7 @@ static uint8_t send_device_ir_info(uint8_t *request ){
     eeprom_read_object( 0xEE, &last_calibrate.w, sizeof(uint16_t) );
     eeprom_read_object( 0xF0, &next_calibrate.w, sizeof(uint16_t) );
     eeprom_read_object( 0xF2, &number_of_calibrate.w, sizeof(uint16_t) );
-                    
-    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
+    
     response[3] = hard_ver.b[0];
     response[4] = hard_ver.b[1];
     response[5] = serial_number_hight.b[0];
@@ -323,8 +323,7 @@ static uint8_t send_device_ir_info(uint8_t *request ){
     response[14] = next_calibrate.b[1];
     response[15] = number_of_calibrate.b[0];
     response[16] = number_of_calibrate.b[1];
-    
-    
+
     j = split_response (request, response );
     
     send(response, j+3);
@@ -338,13 +337,13 @@ static uint8_t send_short_ir_answer(uint8_t *request ){
     {
         return 0;
     }
-    request[STARTING_ADDRESS_LO] -= 0x01;    
+    request[STARTING_ADDRESS_LO] -= 0x01;   
+    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     
     union REG volt, resist;
     resist.w = (uint16_t) abs(response_measure.resistance) * 1000;    //MOm -> KOm
     volt.w = (uint16_t) abs(response_measure.voltagein) * 100;
     
-    response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
     response[3] = volt.b[1];
     response[4] = volt.b[0];
     response[5] = resist.b[1];
@@ -364,30 +363,32 @@ static uint8_t send_long_ir_answer ( uint8_t *request ){
         return 0;
     }
     request[STARTING_ADDRESS_LO] -= 0x14;
-       
-    union FloatChar resistance, voltage, current, voltagein;
-    resistance.fl = response_measure.resistance;
-    voltage.fl = response_measure.voltage;
-    current.fl = response_measure.current;
-    voltagein.fl = response_measure.voltagein;
-        
     response[BYTE_COUNT] = request[QUANTITY_OF_REGISTERS_LO] * 2;
-    response[3] = voltagein.ch[3];
-    response[4] = voltagein.ch[2];
-    response[5] = voltagein.ch[1];
-    response[6] = voltagein.ch[0];
-    response[7] = resistance.ch[3];
-    response[8] = resistance.ch[2];
-    response[9] = resistance.ch[1];
-    response[10] = resistance.ch[0];
-    response[11] = current.ch[3];
-    response[12] = current.ch[2];
-    response[13] = current.ch[1];
-    response[14] = current.ch[0];
-    response[15] = voltage.ch[3];
-    response[16] = voltage.ch[2];
-    response[17] = voltage.ch[1];
-    response[18] = voltage.ch[0];
+
+    union FloatChar fltTmp;
+    fltTmp.fl = response_measure.voltagein;
+    response[3] = fltTmp.ch[3];
+    response[4] = fltTmp.ch[2];
+    response[5] = fltTmp.ch[1];
+    response[6] = fltTmp.ch[0];
+    
+    fltTmp.fl = response_measure.resistance;
+    response[7] = fltTmp.ch[3];
+    response[8] = fltTmp.ch[2];
+    response[9] = fltTmp.ch[1];
+    response[10] = fltTmp.ch[0];
+
+    fltTmp.fl = response_measure.current;
+    response[11] = fltTmp.ch[3];
+    response[12] = fltTmp.ch[2];
+    response[13] = fltTmp.ch[1];
+    response[14] = fltTmp.ch[0];
+    
+    fltTmp.fl = response_measure.voltage;
+    response[15] = fltTmp.ch[3];
+    response[16] = fltTmp.ch[2];
+    response[17] = fltTmp.ch[1];
+    response[18] = fltTmp.ch[0];
     
     j = split_response (request, response );
  
